@@ -67,6 +67,12 @@
 
       <!-- Controls -->
       <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <!-- Market Filter (All / US / TW) -->
+        <div id="market-filter-group" class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs font-semibold">
+          <button type="button" data-mf="ALL" class="mf-btn px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-2xs transition">全部</button>
+          <button type="button" data-mf="USD" class="mf-btn px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">只看美股</button>
+          <button type="button" data-mf="TWD" class="mf-btn px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">只看台股</button>
+        </div>
         <!-- Demo Live Toggle -->
         <button id="btn-demo-live" type="button"
           class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5"
@@ -606,6 +612,14 @@
     let usColorMode = safeGetStorage(STORAGE_KEY_COLOR) !== 'tw';
     const STORAGE_KEY_DISPLAY_CURR = 'tm_display_curr_v2';
     let displayCurrency = safeGetStorage(STORAGE_KEY_DISPLAY_CURR) || 'TWD';
+    const STORAGE_KEY_MARKET_FILTER = 'tm_market_filter_v1';
+    let marketFilter = safeGetStorage(STORAGE_KEY_MARKET_FILTER) || 'ALL';
+
+    function getVisibleStocks() {
+      if (marketFilter === 'USD') return stocks.filter(s => getCurrency(s) === 'USD');
+      if (marketFilter === 'TWD') return stocks.filter(s => getCurrency(s) === 'TWD');
+      return stocks;
+    }
     let usdTwdRate = 32.50;
     let demoLive = false;
     let demoTimer = null;
@@ -770,7 +784,8 @@
 
     function renderSummary() {
       const activeStocks = stocks.filter(s => (Number(s.shares) || 0) > 0);
-      document.getElementById('stat-count').textContent = stocks.length;
+      const visibleActive = getVisibleStocks().filter(s => (Number(s.shares) || 0) > 0);
+      document.getElementById('stat-count').textContent = visibleActive.length;
 
       const formatTWD = (twdVal) => 'NT$' + Math.round(twdVal || 0).toLocaleString('zh-TW');
       const formatUSD = (usdVal) => '$' + Math.round(usdVal || 0).toLocaleString('en-US');
@@ -804,10 +819,10 @@
         if (grandEl) grandEl.textContent = formatUSD(grandTotalUSD);
       }
 
-      const totalMV = activeStocks.reduce((s, d) => s + getMarketValue(d), 0);
+      const visMV = visibleActive.reduce((s, d) => s + getMarketValue(d), 0);
 
-      const totalExposure = activeStocks.reduce((s, d) => s + getMarketValue(d) * getLeverage(d), 0);
-      const levRatio = totalMV > 0 ? totalExposure / totalMV : 1;
+      const totalExposure = visibleActive.reduce((s, d) => s + getMarketValue(d) * getLeverage(d), 0);
+      const levRatio = visMV > 0 ? totalExposure / visMV : 1;
       const levEl = document.getElementById('stat-leverage');
       const expEl = document.getElementById('stat-exposure');
       if (levEl) {
@@ -820,8 +835,8 @@
         expEl.textContent = `(總曝險 ${formatCurrency(totalExposure)})`;
       }
 
-      const weightedPct = totalMV > 0
-        ? activeStocks.reduce((s, d) => s + ((d.pct || 0) * getMarketValue(d)), 0) / totalMV
+      const weightedPct = visMV > 0
+        ? visibleActive.reduce((s, d) => s + ((d.pct || 0) * getMarketValue(d)), 0) / visMV
         : 0;
       const avgEl = document.getElementById('stat-avg');
       avgEl.textContent = `${weightedPct >= 0 ? '+' : ''}${weightedPct.toFixed(2)}%`;
@@ -830,8 +845,8 @@
       const green = usColorMode ? isUp : !isUp;
       avgEl.className = `text-base sm:text-lg font-bold ${green ? 'text-emerald-600' : 'text-rose-600'}`;
 
-      const upCount = activeStocks.filter(d => (d.pct || 0) > 0).length;
-      const downCount = activeStocks.filter(d => (d.pct || 0) < 0).length;
+      const upCount = visibleActive.filter(d => (d.pct || 0) > 0).length;
+      const downCount = visibleActive.filter(d => (d.pct || 0) < 0).length;
       document.getElementById('stat-updown').textContent = `${upCount} / ${downCount}`;
     }
 
@@ -841,18 +856,22 @@
       const height = Math.max(rect.height, 520);
       const gap = 6;
 
-      const layout = computeTreemap(stocks, 0, 0, width, height);
+      const visibleStocks = getVisibleStocks();
+      const layout = computeTreemap(visibleStocks, 0, 0, width, height);
       stageEl.innerHTML = '';
 
       if (layout.length === 0) {
         stageEl.innerHTML = `
           <div class="h-full min-h-[400px] flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
-            <p>目前沒有股數大於 0 的持股</p>
-            <button type="button" id="empty-add-btn" class="px-3.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold">+ 新增持股</button>
+            <p>${marketFilter === 'TWD' ? '目前尚未加入任何台股 / 台股 ETF' : (marketFilter === 'USD' ? '目前尚未加入任何美股持股' : '目前沒有股數大於 0 的持股')}</p>
+            <button type="button" id="empty-add-btn" class="px-3.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold">${marketFilter === 'TWD' ? '+ 新增台股 ETF' : '+ 新增持股'}</button>
           </div>
         `;
         const emptyBtn = document.getElementById('empty-add-btn');
-        if (emptyBtn) emptyBtn.addEventListener('click', () => document.getElementById('btn-manage').click());
+        if (emptyBtn) emptyBtn.addEventListener('click', () => {
+          document.getElementById('btn-manage').click();
+          if (marketFilter === 'TWD') document.getElementById('new-currency').value = 'TWD';
+        });
         renderSummary();
         return;
       }
@@ -1902,7 +1921,7 @@
     }
 
     function getHeldSymbols() {
-      return [...stocks]
+      return [...getVisibleStocks()]
         .filter(s => (Number(s.shares) || 0) > 0)
         .sort((a, b) => getMarketValue(b) - getMarketValue(a))
         .map(s => s.symbol);
@@ -2307,7 +2326,27 @@
       }
     });
 
+    function updateMarketFilterUI() {
+      document.querySelectorAll('.mf-btn').forEach(btn => {
+        const active = btn.dataset.mf === marketFilter;
+        btn.className = active
+          ? 'mf-btn px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-2xs transition'
+          : 'mf-btn px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
+      });
+    }
+
+    document.querySelectorAll('.mf-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        marketFilter = btn.dataset.mf || 'ALL';
+        safeSetStorage(STORAGE_KEY_MARKET_FILTER, marketFilter);
+        updateMarketFilterUI();
+        renderTreemap();
+        syncNewsWithHoldings();
+      });
+    });
+
     window.addEventListener('DOMContentLoaded', () => {
+      updateMarketFilterUI();
       updateStatusUI();
       renderTreemap();
       renderNewsFilters();
