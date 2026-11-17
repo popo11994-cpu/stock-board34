@@ -1,0 +1,2327 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>即時美股熱力圖看板 | Stock Treemap</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      background-color: #f4f5f7;
+      color: #111827;
+    }
+    .treemap-tile {
+      position: absolute;
+      border-radius: 12px;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.45s ease;
+      overflow: hidden;
+      cursor: pointer;
+      user-select: none;
+    }
+    .treemap-tile:hover {
+      z-index: 20;
+      transform: scale(1.012);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
+    }
+    @keyframes pulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45); }
+      70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+    .tile-flash {
+      animation: pulseRing 0.7s ease-out;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Control Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
+      <!-- Brand & Status -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm tracking-tight">TM</div>
+          <div>
+            <h1 class="text-sm sm:text-base font-bold text-slate-900 leading-tight">持股即時熱力圖</h1>
+            <div class="flex items-center gap-2 text-xs text-slate-500">
+              <span id="status-badge" class="inline-flex items-center gap-1.5 font-medium">
+                <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span id="status-text">範例快照</span>
+              </span>
+              <span class="text-slate-300">|</span>
+              <span id="last-updated">尚未連線即時報價</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <!-- Demo Live Toggle -->
+        <button id="btn-demo-live" type="button"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5"
+          title="沒有 API Key 時可先開啟模擬跳動預覽效果">
+          <span id="demo-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          <span>模擬跳動</span>
+        </button>
+
+        <!-- Refresh Interval -->
+        <select id="select-interval" aria-label="更新頻率"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900">
+          <option value="30">每 30 秒</option>
+          <option value="60" selected>每 60 秒</option>
+          <option value="120">每 2 分鐘</option>
+          <option value="0">手動更新</option>
+        </select>
+
+        <!-- Manual Refresh -->
+        <button id="btn-refresh" type="button"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1">
+          <svg id="refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span id="countdown-label">更新</span>
+        </button>
+
+        <!-- Color Convention Toggle -->
+        <button id="btn-color-mode" type="button"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition"
+          title="切換美股(紅跌綠漲)與台股(紅漲綠跌)配色">
+          美股配色 (紅跌綠漲)
+        </button>
+
+        <!-- Portfolio Manager -->
+        <button id="btn-manage" type="button"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 transition flex items-center gap-1">
+          <span>+ 增減持股 / 股數</span>
+        </button>
+
+        <!-- API Key Settings -->
+        <button id="btn-api-modal" type="button"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+          <span id="api-btn-label">設定即時 API</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Summary Strip -->
+  <div class="max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-1 space-y-2.5">
+    <!-- Primary KPI Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+      <div class="col-span-2 sm:col-span-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
+        <div class="flex items-center justify-between gap-2 text-xs sm:text-sm font-medium text-slate-500">
+          <span>股票總市值</span>
+          <button id="btn-display-currency" type="button"
+            class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition"
+            title="點擊切換方塊內市值顯示幣別 (USD / TWD)">TWD</button>
+        </div>
+        <div class="mt-1">
+          <strong id="stat-total-value" class="text-lg sm:text-xl font-extrabold text-slate-950 tracking-tight">NT$0</strong>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
+        <span class="text-xs sm:text-sm font-medium text-slate-500">美股總市值</span>
+        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
+          <strong id="stat-us-twd" class="text-base sm:text-lg font-bold text-slate-900">NT$0</strong>
+          <span id="stat-us-usd" class="text-xs sm:text-sm text-slate-400 font-medium">($0)</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
+        <span class="text-xs sm:text-sm font-medium text-slate-500">台股總市值</span>
+        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
+          <strong id="stat-tw-twd" class="text-base sm:text-lg font-bold text-slate-900">NT$0</strong>
+          <span id="stat-tw-sub" class="text-xs sm:text-sm text-slate-400 font-medium"></span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between" title="依各持股「市值 × 槓桿倍數」加總後除以總市值計算">
+        <span class="text-xs sm:text-sm font-medium text-slate-500">總槓桿比例</span>
+        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
+          <strong id="stat-leverage" class="text-base sm:text-lg font-extrabold text-slate-900">1.00x</strong>
+          <span id="stat-exposure" class="text-xs text-slate-400 font-medium"></span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
+        <span class="text-xs sm:text-sm font-medium text-slate-500">加權漲跌</span>
+        <div class="mt-1 flex items-baseline justify-between gap-2">
+          <strong id="stat-avg" class="text-base sm:text-lg font-bold">-3.24%</strong>
+          <span class="text-xs sm:text-sm text-slate-500">漲/跌 <strong id="stat-updown" class="text-slate-900">0 / 21</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secondary Info Pills -->
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 font-medium">
+          <span>持股檔數：</span>
+          <strong id="stat-count" class="text-slate-900 font-bold">21</strong>
+          <span>檔</span>
+        </span>
+        <span id="btc-live-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 font-medium">
+          <span>₿ BTC 24H：</span>
+          <strong id="btc-live-val" class="font-bold">讀取中...</strong>
+        </span>
+        <span id="fx-live-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 font-medium">
+          <span>USD/TWD：</span>
+          <strong id="fx-live-val" class="text-slate-900 font-bold">32.50</strong>
+        </span>
+      </div>
+      <div id="api-error-banner" class="hidden text-rose-600 font-medium bg-rose-50 border border-rose-200 px-3 py-1 rounded-lg"></div>
+    </div>
+  </div>
+
+  <!-- Main Treemap Container -->
+  <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 flex-1 flex flex-col">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-3 flex-1 flex flex-col">
+      <div id="treemap-stage" class="relative w-full flex-1 min-h-[540px] sm:min-h-[620px]"></div>
+    </div>
+
+    <!-- Holdings Related News Section -->
+    <section class="mt-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2.5">
+          <h2 class="text-sm sm:text-base font-bold text-slate-900">持股相關即時新聞</h2>
+          <span id="news-mode-badge" class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">範例預覽</span>
+          <span id="news-updated-at" class="text-xs text-slate-400"></span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="btn-news-lang" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition">
+            顯示：繁體中文
+          </button>
+          <button id="btn-refresh-news" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1.5">
+          <svg id="news-refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>更新新聞</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Ticker Filter Pills -->
+      <div id="news-filter-bar" class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3"></div>
+
+      <!-- News Cards Grid -->
+      <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+    </section>
+  </main>
+
+  <!-- Floating Tooltip -->
+  <div id="tooltip" class="fixed pointer-events-none z-50 hidden bg-slate-900/95 text-white rounded-xl px-3.5 py-2.5 shadow-xl text-xs max-w-[270px] backdrop-blur-sm">
+    <div class="flex items-center justify-between gap-4 mb-1">
+      <span id="tt-symbol" class="font-bold text-sm">QQQ</span>
+      <span id="tt-pct" class="font-bold text-sm">-2.67%</span>
+    </div>
+    <div id="tt-name" class="text-slate-300 text-[11px] mb-1.5 truncate">Invesco QQQ Trust, Series 1</div>
+    <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] border-t border-slate-700 pt-1.5">
+      <span class="text-slate-400">現價</span><span id="tt-price" class="text-right font-medium">--</span>
+      <span class="text-slate-400">持有股數</span><span id="tt-shares" class="text-right font-medium">--</span>
+      <span class="text-slate-400">持股市值 (佔比)</span><span id="tt-weight" class="text-right font-medium">--</span>
+      <span class="text-slate-400">當日區間</span><span id="tt-range" class="text-right font-medium">--</span>
+    </div>
+  </div>
+
+  <!-- Stock Detail Modal -->
+  <div id="detail-modal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 border border-slate-200">
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 id="dm-symbol" class="text-xl font-extrabold text-slate-900">QQQ</h2>
+            <span id="dm-pct" class="px-2 py-0.5 rounded-md text-xs font-bold">-2.67%</span>
+          </div>
+          <p id="dm-name" class="text-xs text-slate-500 mt-0.5">Invesco QQQ Trust, Series 1</p>
+        </div>
+        <button id="dm-close" type="button" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 bg-slate-50 rounded-xl p-3.5 text-xs mb-4">
+        <div>
+          <div class="text-slate-400 mb-0.5">最新股價</div>
+          <div id="dm-price" class="text-base font-bold text-slate-900">--</div>
+        </div>
+        <div>
+          <div class="text-slate-400 mb-0.5">持股總市值</div>
+          <div id="dm-value" class="text-base font-bold text-slate-900">--</div>
+        </div>
+        <div>
+          <div class="text-slate-400 mb-0.5">當日漲跌金額</div>
+          <div id="dm-change" class="font-semibold text-slate-700">--</div>
+        </div>
+        <div>
+          <div class="text-slate-400 mb-0.5">當日最高 / 最低</div>
+          <div id="dm-hl" class="font-semibold text-slate-700">--</div>
+        </div>
+        <div class="col-span-2 flex justify-between border-t border-slate-200 pt-2">
+          <span class="text-slate-400">昨日收盤</span>
+          <span id="dm-pc" class="font-semibold text-slate-700">--</span>
+        </div>
+      </div>
+
+      <div class="mb-3 flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-3.5 py-2 text-xs">
+        <span class="font-semibold text-slate-700">標的槓桿倍數</span>
+        <select id="dm-leverage-select" aria-label="標的槓桿倍數"
+          class="px-2.5 py-1 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold text-xs focus:outline-none focus:ring-2 focus:ring-slate-900">
+          <option value="1">1x (原型)</option>
+          <option value="2">2x (兩倍做多)</option>
+          <option value="3">3x (三倍做多)</option>
+          <option value="-1">-1x (反向)</option>
+          <option value="-2">-2x (兩倍反向)</option>
+          <option value="-3">-3x (三倍反向)</option>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-slate-700 mb-1.5" for="dm-shares-input">增減持有股數（即時重算市值與方塊面積）</label>
+        <div class="flex items-center gap-2">
+          <button id="dm-shares-dec" type="button"
+            class="w-9 h-9 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-base flex items-center justify-center">−</button>
+          <input id="dm-shares-input" type="number" min="0" step="any"
+            class="flex-1 px-3 py-1.5 text-sm text-center font-semibold border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          <button id="dm-shares-inc" type="button"
+            class="w-9 h-9 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-base flex items-center justify-center">+</button>
+          <button id="dm-save-shares" type="button"
+            class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition">
+            套用股數
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+        <a id="dm-yahoo-link" href="#" target="_blank" rel="noopener noreferrer"
+          class="text-blue-600 hover:underline font-medium">在 Yahoo Finance 查看 →</a>
+        <button id="dm-remove" type="button" class="text-rose-600 hover:text-rose-700 font-medium">從持股移除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Portfolio Manager Modal -->
+  <div id="manage-modal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">管理持股與股數</h2>
+          <p class="text-xs text-slate-500">可自由新增或移除標的，並調整股數（方塊面積依「股數 × 股價」市值比例自動計算）</p>
+        </div>
+        <button id="mm-close" type="button" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+      </div>
+
+      <!-- Add Ticker Form -->
+      <form id="add-ticker-form" class="px-5 py-3 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 items-end">
+        <div class="w-28">
+          <label class="block text-[11px] font-medium text-slate-600 mb-1" for="new-symbol">代號 (美/台股)</label>
+          <input id="new-symbol" type="text" placeholder="TSM / 0050" required
+            class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg uppercase focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div class="flex-1 min-w-[130px]">
+          <label class="block text-[11px] font-medium text-slate-600 mb-1" for="new-name">顯示名稱</label>
+          <input id="new-name" type="text" placeholder="如 台積電 ADR"
+            class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div class="w-24">
+          <label class="block text-[11px] font-medium text-slate-600 mb-1" for="new-shares">持有股數</label>
+          <input id="new-shares" type="number" min="0.001" step="any" value="10" required
+            class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div class="w-24">
+          <label class="block text-[11px] font-medium text-slate-600 mb-1" for="new-price">參考股價 ($)</label>
+          <input id="new-price" type="number" min="0.01" step="any" placeholder="選填"
+            class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div class="w-24">
+          <label class="block text-[11px] font-medium text-slate-600 mb-1" for="new-currency">市場幣別</label>
+          <select id="new-currency"
+            class="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <option value="USD" selected>美股 USD</option>
+            <option value="TWD">台股 TWD</option>
+          </select>
+        </div>
+        <div class="w-24">
+          <label class="block text-[11px] font-medium text-slate-600 mb-1" for="new-leverage">槓桿倍數</label>
+          <select id="new-leverage"
+            class="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+            <option value="-1">-1x</option>
+            <option value="-2">-2x</option>
+            <option value="-3">-3x</option>
+          </select>
+        </div>
+        <button type="submit"
+          class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition">
+          + 新增持股
+        </button>
+      </form>
+
+      <!-- List -->
+      <div class="overflow-y-auto px-5 py-3 flex-1">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-slate-400 border-b border-slate-100">
+              <th class="pb-2 font-medium">代號</th>
+              <th class="pb-2 font-medium">名稱</th>
+              <th class="pb-2 font-medium text-center">持有股數</th>
+              <th class="pb-2 font-medium text-center">槓桿</th>
+              <th class="pb-2 font-medium text-right">現價 / 市值</th>
+              <th class="pb-2 font-medium text-right">漲跌幅</th>
+              <th class="pb-2 font-medium text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="mm-tbody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+
+      <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50 rounded-b-2xl">
+        <button id="mm-reset" type="button" class="text-xs text-slate-500 hover:text-slate-900 font-medium">
+          恢復預設 21 檔配置
+        </button>
+        <button id="mm-done" type="button" class="px-4 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg">
+          完成
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-banner" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2 max-w-[90vw]">
+    <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+    <span id="toast-text"></span>
+  </div>
+
+  <!-- Market Data API Settings Modal -->
+  <div id="api-modal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 border border-slate-200">
+      <div class="flex items-start justify-between mb-3">
+        <h2 class="text-base font-bold text-slate-900">設定即時報價 API</h2>
+        <button id="am-close" type="button" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+      </div>
+
+      <!-- Provider Tabs -->
+      <div class="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-3 text-[11px] sm:text-xs font-semibold">
+        <button id="am-tab-alpaca" type="button" class="py-1.5 rounded-lg bg-white text-slate-900 shadow-xs transition">
+          美股 Alpaca
+        </button>
+        <button id="am-tab-finnhub" type="button" class="py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">
+          美股 Finnhub
+        </button>
+        <button id="am-tab-fugle" type="button" class="py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">
+          台股 Fugle
+        </button>
+      </div>
+
+      <!-- Alpaca Panel -->
+      <div id="am-panel-alpaca" class="space-y-3">
+        <p class="text-xs text-slate-600 leading-relaxed">
+          <strong>Alpaca</strong> 免費方案支援美股<strong>盤前（Pre-market）與盤後（After-hours）</strong>即時報價，適合在台灣晚上直接追蹤美股盤前漲跌，且單次即可批次更新所有持股。
+        </p>
+        <ol class="text-xs text-slate-600 space-y-1 bg-slate-50 rounded-xl p-3 list-decimal list-inside">
+          <li>前往 <a href="https://app.alpaca.markets/signup" target="_blank" rel="noopener noreferrer" class="text-blue-600 font-semibold hover:underline">app.alpaca.markets</a> 免費註冊。</li>
+          <li>在右側 Paper Trading 面板點選 <strong>API Keys → Generate</strong>。</li>
+          <li>複製 <strong>API Key ID</strong> 與 <strong>Secret Key</strong> 貼到下方。</li>
+        </ol>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="alpaca-key-input">Alpaca API Key ID</label>
+          <input id="alpaca-key-input" type="text" placeholder="PK..."
+            class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="alpaca-secret-input">Alpaca Secret Key</label>
+          <input id="alpaca-secret-input" type="password" placeholder="貼上 Secret Key..."
+            class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+      </div>
+
+      <!-- Finnhub Panel -->
+      <div id="am-panel-finnhub" class="hidden space-y-3">
+        <p class="text-xs text-slate-600 leading-relaxed">
+          <strong>Finnhub</strong> 免費方案每分鐘支援 60 次查詢，提供美股正規盤中即時報價與即時公司新聞（不含盤前／盤後）。
+        </p>
+        <ol class="text-xs text-slate-600 space-y-1 bg-slate-50 rounded-xl p-3 list-decimal list-inside">
+          <li>前往 <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" class="text-blue-600 font-semibold hover:underline">finnhub.io/register</a> 免費註冊。</li>
+          <li>登入後在 Dashboard 複製你的 <strong>API Key</strong> 貼到下方。</li>
+        </ol>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="api-key-input">Finnhub API Key</label>
+          <input id="api-key-input" type="password" placeholder="貼上你的 Finnhub Token..."
+            class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+      </div>
+
+      <!-- Fugle Taiwan Stock Panel -->
+      <div id="am-panel-fugle" class="hidden space-y-3">
+        <p class="text-xs text-slate-600 leading-relaxed">
+          <strong>富果 Fugle 行情 API</strong> 提供台股與台股 ETF（如 0050、00631L）<strong>盤中即時現價與漲跌幅</strong>，基本用戶免費方案每分鐘支援 60 次查詢（可與美股 API 同時運作）。
+        </p>
+        <ol class="text-xs text-slate-600 space-y-1 bg-slate-50 rounded-xl p-3 list-decimal list-inside">
+          <li>前往 <a href="https://developer.fugle.tw/docs/key/" target="_blank" rel="noopener noreferrer" class="text-blue-600 font-semibold hover:underline">富果 Fugle 開發者平台</a> 申請免費行情 API Key。</li>
+          <li>複製你的 <strong>X-API-KEY</strong> 貼到下方儲存，台股盤中即會同步即時跳動。</li>
+        </ol>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="fugle-key-input">Fugle API Key (台股即時)</label>
+          <input id="fugle-key-input" type="password" placeholder="貼上你的 Fugle API Key..."
+            class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-slate-100">
+        <button id="am-clear" type="button" class="text-xs text-rose-600 hover:underline font-medium">
+          清除金鑰（切回範例）
+        </button>
+        <div class="flex items-center gap-2">
+          <button id="am-cancel" type="button" class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
+          <button id="am-save" type="button" class="px-4 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg">
+            儲存並立即連線
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Default 21 tickers with exact share counts & market values from user screenshot
+    const DEFAULT_STOCKS = [
+      { symbol: 'QQQ',  name: 'Invesco QQQ Trust, Series 1', shares: 69.95918, price: 663.99, isLivePrice: false, pct: -2.67, change: null, high: null, low: null, pc: null, color: '#1d4ed8' },
+      { symbol: 'IVV',  name: 'iShares Core S&P 500 ETF',    shares: 47.10354, price: 742.62, isLivePrice: false, pct: -1.89, change: null, high: null, low: null, pc: null, color: '#0f172a' },
+      { symbol: 'MSFT', name: '微軟',                         shares: 41.20085, price: 514.36, isLivePrice: false, pct: -1.12, change: null, high: null, low: null, pc: null, color: '#0284c7' },
+      { symbol: 'TSLA', name: '特斯拉汽車',                   shares: 51,       price: 381.51, isLivePrice: false, pct: -2.69, change: null, high: null, low: null, pc: null, color: '#dc2626' },
+      { symbol: 'AMZN', name: '亞馬遜公司',                   shares: 54,       price: 259.20, isLivePrice: false, pct: -3.34, change: null, high: null, low: null, pc: null, color: '#d97706' },
+      { symbol: 'PLTR', name: '帕蘭泰爾技術公司',             shares: 85,       price: 160.33, isLivePrice: false, pct: -4.52, change: null, high: null, low: null, pc: null, color: '#111827' },
+      { symbol: 'META', name: 'Meta',                         shares: 21.08903, price: 620.89, isLivePrice: false, pct: -2.38, change: null, high: null, low: null, pc: null, color: '#2563eb' },
+      { symbol: 'GOOG', name: 'Alphabet',                     shares: 41.05168, price: 280.74, isLivePrice: false, pct: -3.85, change: null, high: null, low: null, pc: null, color: '#059669' },
+      { symbol: 'SPCX', name: 'SpaceX',                       shares: 65,       price: 138.49, isLivePrice: false, pct: -1.26, change: null, high: null, low: null, pc: null, color: '#1e293b' },
+      { symbol: 'NVDA', name: 'NVIDIA',                       shares: 52.11013, price: 157.92, isLivePrice: false, pct: -4.12, change: null, high: null, low: null, pc: null, color: '#65a30d' },
+      { symbol: 'TQQQ', name: 'ProShares UltraPro QQQ',       shares: 80.59477, price: 53.53,  isLivePrice: false, pct: -8.06, change: null, high: null, low: null, pc: null, color: '#0284c7' },
+      { symbol: 'FBTC', name: 'Fidelity Wise Origin Bitcoin', shares: 71,       price: 56.43,  isLivePrice: false, pct: -5.61, change: null, high: null, low: null, pc: null, color: '#15803d' },
+      { symbol: 'SE',   name: 'Sea Limited',                  shares: 41,       price: 70.50,  isLivePrice: false, pct: -4.97, change: null, high: null, low: null, pc: null, color: '#ea580c' },
+      { symbol: 'NVDL', name: 'GraniteShares 2x Long NVDA',   shares: 125,      price: 16.72,  isLivePrice: false, pct: -8.30, change: null, high: null, low: null, pc: null, color: '#18181b' },
+      { symbol: 'GGLL', name: 'Direxion Daily GOOGL 2X',      shares: 17,       price: 64.61,  isLivePrice: false, pct: -8.15, change: null, high: null, low: null, pc: null, color: '#0369a1' },
+      { symbol: 'AAPL', name: 'Apple',                        shares: 1.03253,  price: 351.09, isLivePrice: false, pct: -0.98, change: null, high: null, low: null, pc: null, color: '#18181b' },
+      { symbol: 'UPRO', name: 'ProShares UltraPro S&P500',    shares: 1.04883,  price: 130.17, isLivePrice: false, pct: -5.65, change: null, high: null, low: null, pc: null, color: '#0284c7' },
+      { symbol: 'U',    name: 'Unity Software',               shares: 1,        price: 51.65,  isLivePrice: false, pct: -1.76, change: null, high: null, low: null, pc: null, color: '#27272a' },
+      { symbol: 'TSLL', name: 'Direxion Daily TSLA 2X',       shares: 1.52601,  price: 9.90,   isLivePrice: false, pct: -5.50, change: null, high: null, low: null, pc: null, color: '#0369a1' },
+      { symbol: 'FLG',  name: 'Flagstar Financial',           shares: 1.00738,  price: 10.36,  isLivePrice: false, pct: -0.76, change: null, high: null, low: null, pc: null, color: '#ca8a04' },
+      { symbol: 'TDOC', name: 'Teladoc Health',               shares: 1,        price: 8.70,   isLivePrice: false, pct: -1.08, change: null, high: null, low: null, pc: null, color: '#4f46e5' }
+    ];
+
+    const KNOWN_TW_ETFS = {
+      '0050':   { name: '元大台灣50',       lev: 1,  price: 195.0 },
+      '006208': { name: '富邦台50',         lev: 1,  price: 112.0 },
+      '0056':   { name: '元大高股息',       lev: 1,  price: 38.0 },
+      '00878':  { name: '國泰永續高股息',   lev: 1,  price: 22.5 },
+      '00919':  { name: '群益台灣精選高息', lev: 1,  price: 23.5 },
+      '00713':  { name: '元大台灣高息低波', lev: 1,  price: 55.0 },
+      '00757':  { name: '統一FANG+',        lev: 1,  price: 95.0 },
+      '00662':  { name: '富邦NASDAQ',       lev: 1,  price: 88.0 },
+      '00631L': { name: '元大台灣50正2',    lev: 2,  price: 245.0 },
+      '00675L': { name: '富邦臺灣加權正2',  lev: 2,  price: 92.0 },
+      '00685L': { name: '群益臺灣加權正2',  lev: 2,  price: 85.0 },
+      '00663L': { name: '國泰臺灣加權正2',  lev: 2,  price: 220.0 },
+      '00670L': { name: '富邦NASDAQ正2',    lev: 2,  price: 165.0 },
+      '00632R': { name: '元大台灣50反1',    lev: -1, price: 3.5 },
+      '2330':   { name: '台積電',           lev: 1,  price: 1050.0 }
+    };
+
+    function isTaiwanSymbol(sym) {
+      return /^\d{4,6}[A-Z]?$/.test(String(sym || '').replace(/\.(TW|TWO)$/i, '').trim());
+    }
+
+    function getCurrency(item) {
+      if (item && (item.currency === 'TWD' || item.currency === 'USD')) return item.currency;
+      return isTaiwanSymbol(item && item.symbol) ? 'TWD' : 'USD';
+    }
+
+    const KNOWN_LEVERAGE = {
+      TQQQ: 3, UPRO: 3, SOXL: 3, TECL: 3, SPXL: 3, UDOW: 3, TNA: 3, FNGU: 3,
+      NVDL: 2, GGLL: 2, TSLL: 2, QLD: 2, SSO: 2, BITX: 2, CONL: 2, AMZU: 2, MSFU: 2, AAPU: 2, METU: 2,
+      SQQQ: -3, SPXS: -3, SOXS: -3, QID: -2, SDS: -2, SH: -1, PSQ: -1,
+      '00631L': 2, '00675L': 2, '00685L': 2, '00663L': 2, '00670L': 2, '00632R': -1
+    };
+
+    function getLeverage(item) {
+      if (item && typeof item.leverage === 'number' && !isNaN(item.leverage)) return item.leverage;
+      return KNOWN_LEVERAGE[(item && item.symbol) || ''] || 1;
+    }
+
+    const STORAGE_KEY_STOCKS = 'tm_portfolio_v3';
+    const STORAGE_KEY_API = 'tm_finnhub_key_v1';
+    const STORAGE_KEY_COLOR = 'tm_color_mode_v1';
+
+    function safeGetStorage(key) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+    function safeSetStorage(key, val) {
+      try { localStorage.setItem(key, val); } catch (e) {}
+    }
+    function safeRemoveStorage(key) {
+      try { localStorage.removeItem(key); } catch (e) {}
+    }
+
+    let stocks = (() => {
+      const raw = safeGetStorage(STORAGE_KEY_STOCKS);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_STOCKS));
+    })();
+
+    const STORAGE_KEY_PROVIDER = 'tm_provider_v1';
+    const STORAGE_KEY_ALPACA_ID = 'tm_alpaca_id_v1';
+    const STORAGE_KEY_ALPACA_SEC = 'tm_alpaca_sec_v1';
+
+    let apiKey = safeGetStorage(STORAGE_KEY_API) || '';
+    let alpacaKeyId = safeGetStorage(STORAGE_KEY_ALPACA_ID) || '';
+    let alpacaSecret = safeGetStorage(STORAGE_KEY_ALPACA_SEC) || '';
+    const STORAGE_KEY_FUGLE = 'tm_fugle_key_v1';
+    let fugleKey = safeGetStorage(STORAGE_KEY_FUGLE) || '';
+    let activeProvider = safeGetStorage(STORAGE_KEY_PROVIDER) || (alpacaKeyId && alpacaSecret ? 'alpaca' : (apiKey ? 'finnhub' : 'alpaca'));
+    let modalProvider = activeProvider;
+
+    function hasActiveQuotesAuth() {
+      return (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret) ||
+             (activeProvider === 'finnhub' && apiKey) ||
+             Boolean(fugleKey);
+    }
+    let usColorMode = safeGetStorage(STORAGE_KEY_COLOR) !== 'tw';
+    const STORAGE_KEY_DISPLAY_CURR = 'tm_display_curr_v2';
+    let displayCurrency = safeGetStorage(STORAGE_KEY_DISPLAY_CURR) || 'TWD';
+    let usdTwdRate = 32.50;
+    let demoLive = false;
+    let demoTimer = null;
+    let pollTimer = null;
+    let countdownTimer = null;
+    let countdownSeconds = 60;
+    let isFetching = false;
+    let selectedSymbol = null;
+
+    // DOM Elements
+    const stageEl = document.getElementById('treemap-stage');
+    const tooltipEl = document.getElementById('tooltip');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const lastUpdatedEl = document.getElementById('last-updated');
+    const countdownLabel = document.getElementById('countdown-label');
+    const refreshIcon = document.getElementById('refresh-icon');
+    const errorBanner = document.getElementById('api-error-banner');
+
+    function getMarketValueUSD(item) {
+      const shares = Number(item.shares) || 0;
+      const price = Number(item.price) || 100;
+      const raw = Math.max(shares * price, 0);
+      return getCurrency(item) === 'TWD' ? (raw / usdTwdRate) : raw;
+    }
+
+    function getMarketValue(item) {
+      // Always use USD-normalized value for treemap area & cross-market weighting
+      return getMarketValueUSD(item);
+    }
+
+    function formatCurrency(valUSD) {
+      if (displayCurrency === 'TWD') {
+        const twd = Number(valUSD || 0) * usdTwdRate;
+        return 'NT$' + twd.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      }
+      return '$' + Number(valUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function formatNativePrice(item) {
+      if (item.price == null) return '';
+      const prefix = getCurrency(item) === 'TWD' ? 'NT$' : '$';
+      return `${prefix}${Number(item.price).toFixed(2)}`;
+    }
+
+    function formatShares(s) {
+      const n = Number(s) || 0;
+      return Number.isInteger(n) ? n.toLocaleString('en-US') : n.toFixed(5).replace(/\.?0+$/, '');
+    }
+
+    // Squarified Treemap Algorithm
+    function computeTreemap(items, x, y, width, height) {
+      const valid = items
+        .map(d => ({ ...d, mv: getMarketValue(d) }))
+        .filter(d => d.mv > 0)
+        .sort((a, b) => b.mv - a.mv);
+
+      const totalMV = valid.reduce((sum, d) => sum + d.mv, 0);
+      if (totalMV <= 0 || width <= 0 || height <= 0) return [];
+
+      const totalArea = width * height;
+      const nodes = valid.map(d => ({
+        ...d,
+        area: (d.mv / totalMV) * totalArea
+      }));
+
+      const rects = [];
+
+      function worstRatio(row, sideLength) {
+        if (row.length === 0) return Infinity;
+        let sum = 0, maxA = 0, minA = Infinity;
+        for (const r of row) {
+          sum += r.area;
+          if (r.area > maxA) maxA = r.area;
+          if (r.area < minA) minA = r.area;
+        }
+        const s2 = sum * sum;
+        const w2 = sideLength * sideLength;
+        return Math.max((w2 * maxA) / s2, s2 / (w2 * minA));
+      }
+
+      function layoutRow(row, rx, ry, rw, rh) {
+        const sum = row.reduce((s, r) => s + r.area, 0);
+        if (rw >= rh) {
+          const stripW = sum / rh;
+          let cy = ry;
+          for (const item of row) {
+            const itemH = item.area / stripW;
+            rects.push({ item, x: rx, y: cy, w: stripW, h: itemH });
+            cy += itemH;
+          }
+          return { x: rx + stripW, y: ry, w: rw - stripW, h: rh };
+        } else {
+          const stripH = sum / rw;
+          let cx = rx;
+          for (const item of row) {
+            const itemW = item.area / stripH;
+            rects.push({ item, x: cx, y: ry, w: itemW, h: stripH });
+            cx += itemW;
+          }
+          return { x: rx, y: ry + stripH, w: rw, h: rh - stripH };
+        }
+      }
+
+      function squarify(children, row, rx, ry, rw, rh) {
+        if (children.length === 0) {
+          if (row.length > 0) layoutRow(row, rx, ry, rw, rh);
+          return;
+        }
+        const side = Math.min(rw, rh);
+        const next = children[0];
+        const newRow = [...row, next];
+        if (row.length === 0 || worstRatio(newRow, side) <= worstRatio(row, side)) {
+          squarify(children.slice(1), newRow, rx, ry, rw, rh);
+        } else {
+          const box = layoutRow(row, rx, ry, rw, rh);
+          squarify(children, [], box.x, box.y, box.w, box.h);
+        }
+      }
+
+      squarify(nodes, [], x, y, width, height);
+      return rects;
+    }
+
+    function getTileColors(pct) {
+      const val = Number(pct) || 0;
+      const abs = Math.abs(val);
+      const isPositive = val > 0;
+      const isZero = Math.abs(val) < 0.005;
+
+      if (isZero) {
+        return { bg: '#e2e8f0', text: '#1e293b', sub: '#475569', badgeBg: 'rgba(255,255,255,0.75)' };
+      }
+
+      const useGreen = usColorMode ? isPositive : !isPositive;
+      const t = Math.min(abs / 8.5, 1);
+
+      if (useGreen) {
+        const r = Math.round(214 - t * 145);
+        const g = Math.round(244 - t * 65);
+        const b = Math.round(224 - t * 105);
+        const darkText = t < 0.55;
+        return {
+          bg: `rgb(${r}, ${g}, ${b})`,
+          text: darkText ? '#064e3b' : '#ffffff',
+          sub: darkText ? '#065f46' : 'rgba(255,255,255,0.88)',
+          badgeBg: 'rgba(255,255,255,0.85)'
+        };
+      } else {
+        const r = Math.round(250 - t * 16);
+        const g = Math.round(218 - t * 108);
+        const b = Math.round(215 - t * 110);
+        const darkText = t < 0.68;
+        return {
+          bg: `rgb(${r}, ${g}, ${b})`,
+          text: darkText ? '#881313' : '#ffffff',
+          sub: darkText ? '#9f1212' : 'rgba(255,255,255,0.9)',
+          badgeBg: 'rgba(255,255,255,0.85)'
+        };
+      }
+    }
+
+    function renderSummary() {
+      const activeStocks = stocks.filter(s => (Number(s.shares) || 0) > 0);
+      document.getElementById('stat-count').textContent = stocks.length;
+
+      const formatTWD = (twdVal) => 'NT$' + Math.round(twdVal || 0).toLocaleString('zh-TW');
+      const formatUSD = (usdVal) => '$' + Math.round(usdVal || 0).toLocaleString('en-US');
+      const usStocks = activeStocks.filter(d => getCurrency(d) === 'USD');
+      const twStocks = activeStocks.filter(d => getCurrency(d) === 'TWD');
+
+      const usTotalUSD = usStocks.reduce((s, d) => s + ((Number(d.shares) || 0) * (Number(d.price) || 0)), 0);
+      const usTotalTWD = usTotalUSD * usdTwdRate;
+      const twTotalTWD = twStocks.reduce((s, d) => s + ((Number(d.shares) || 0) * (Number(d.price) || 0)), 0);
+      const twTotalUSD = usdTwdRate > 0 ? twTotalTWD / usdTwdRate : 0;
+      const grandTotalUSD = usTotalUSD + twTotalUSD;
+      const grandTotalTWD = usTotalTWD + twTotalTWD;
+
+      const usTwdEl = document.getElementById('stat-us-twd');
+      const usUsdEl = document.getElementById('stat-us-usd');
+      const twTwdEl = document.getElementById('stat-tw-twd');
+      const twSubEl = document.getElementById('stat-tw-sub');
+      const grandEl = document.getElementById('stat-total-value');
+
+      if (displayCurrency === 'TWD') {
+        if (usTwdEl) usTwdEl.textContent = formatTWD(usTotalTWD);
+        if (usUsdEl) usUsdEl.textContent = `(${formatUSD(usTotalUSD)})`;
+        if (twTwdEl) twTwdEl.textContent = formatTWD(twTotalTWD);
+        if (twSubEl) twSubEl.textContent = '';
+        if (grandEl) grandEl.textContent = formatTWD(grandTotalTWD);
+      } else {
+        if (usTwdEl) usTwdEl.textContent = formatUSD(usTotalUSD);
+        if (usUsdEl) usUsdEl.textContent = `(${formatTWD(usTotalTWD)})`;
+        if (twTwdEl) twTwdEl.textContent = formatUSD(twTotalUSD);
+        if (twSubEl) twSubEl.textContent = twTotalTWD > 0 ? `(${formatTWD(twTotalTWD)})` : '';
+        if (grandEl) grandEl.textContent = formatUSD(grandTotalUSD);
+      }
+
+      const totalMV = activeStocks.reduce((s, d) => s + getMarketValue(d), 0);
+
+      const totalExposure = activeStocks.reduce((s, d) => s + getMarketValue(d) * getLeverage(d), 0);
+      const levRatio = totalMV > 0 ? totalExposure / totalMV : 1;
+      const levEl = document.getElementById('stat-leverage');
+      const expEl = document.getElementById('stat-exposure');
+      if (levEl) {
+        levEl.textContent = `${levRatio.toFixed(2)}x`;
+        if (levRatio >= 1.8) levEl.className = 'text-base sm:text-lg font-extrabold text-rose-600';
+        else if (levRatio >= 1.25) levEl.className = 'text-base sm:text-lg font-extrabold text-amber-600';
+        else levEl.className = 'text-base sm:text-lg font-extrabold text-slate-900';
+      }
+      if (expEl) {
+        expEl.textContent = `(總曝險 ${formatCurrency(totalExposure)})`;
+      }
+
+      const weightedPct = totalMV > 0
+        ? activeStocks.reduce((s, d) => s + ((d.pct || 0) * getMarketValue(d)), 0) / totalMV
+        : 0;
+      const avgEl = document.getElementById('stat-avg');
+      avgEl.textContent = `${weightedPct >= 0 ? '+' : ''}${weightedPct.toFixed(2)}%`;
+
+      const isUp = weightedPct >= 0;
+      const green = usColorMode ? isUp : !isUp;
+      avgEl.className = `text-base sm:text-lg font-bold ${green ? 'text-emerald-600' : 'text-rose-600'}`;
+
+      const upCount = activeStocks.filter(d => (d.pct || 0) > 0).length;
+      const downCount = activeStocks.filter(d => (d.pct || 0) < 0).length;
+      document.getElementById('stat-updown').textContent = `${upCount} / ${downCount}`;
+    }
+
+    function renderTreemap(changedSymbols = new Set()) {
+      const rect = stageEl.getBoundingClientRect();
+      const width = rect.width;
+      const height = Math.max(rect.height, 520);
+      const gap = 6;
+
+      const layout = computeTreemap(stocks, 0, 0, width, height);
+      stageEl.innerHTML = '';
+
+      if (layout.length === 0) {
+        stageEl.innerHTML = `
+          <div class="h-full min-h-[400px] flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+            <p>目前沒有股數大於 0 的持股</p>
+            <button type="button" id="empty-add-btn" class="px-3.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold">+ 新增持股</button>
+          </div>
+        `;
+        const emptyBtn = document.getElementById('empty-add-btn');
+        if (emptyBtn) emptyBtn.addEventListener('click', () => document.getElementById('btn-manage').click());
+        renderSummary();
+        return;
+      }
+
+      for (const node of layout) {
+        const { item, x, y, w, h } = node;
+        const tileW = Math.max(w - gap, 4);
+        const tileH = Math.max(h - gap, 4);
+        const colors = getTileColors(item.pct);
+
+        const tile = document.createElement('div');
+        tile.className = 'treemap-tile' + (changedSymbols.has(item.symbol) ? ' tile-flash' : '');
+        tile.style.left = `${x + gap / 2}px`;
+        tile.style.top = `${y + gap / 2}px`;
+        tile.style.width = `${tileW}px`;
+        tile.style.height = `${tileH}px`;
+        tile.style.backgroundColor = colors.bg;
+        tile.style.color = colors.text;
+
+        const pctVal = Number(item.pct || 0);
+        const arrow = pctVal > 0 ? '↑' : (pctVal < 0 ? '↓' : '–');
+        const pctStr = `${pctVal > 0 ? '+' : ''}${pctVal.toFixed(2)}%`;
+        const priceStr = formatNativePrice(item);
+        const mvStr = formatCurrency(getMarketValue(item));
+        const sharesStr = `${formatShares(item.shares)} 股`;
+
+        if (tileH < 46 || tileW < 85) {
+          tile.innerHTML = `
+            <div class="h-full w-full px-2.5 flex items-center justify-between gap-1.5 text-xs font-bold truncate">
+              <span class="truncate">${item.symbol}</span>
+              <span class="shrink-0 font-semibold" style="color:${colors.sub}">${pctStr}</span>
+            </div>
+          `;
+        } else if (tileW < 135 || tileH < 105) {
+          tile.innerHTML = `
+            <div class="h-full w-full p-2.5 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between gap-1">
+                  <span class="font-bold text-sm leading-tight truncate">${item.symbol}</span>
+                  ${priceStr ? `<span class="text-[11px] font-semibold opacity-85">${priceStr}</span>` : ''}
+                </div>
+                <div class="text-xs font-semibold mt-0.5 flex items-center gap-1" style="color:${colors.sub}">
+                  <span>${pctStr}</span>
+                  <span class="text-[10px]">${arrow}</span>
+                </div>
+              </div>
+              ${tileH >= 84 ? `
+                <div class="flex items-center justify-between gap-1">
+                  <span class="text-[10px] opacity-80 truncate">${sharesStr}</span>
+                  <span class="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold shrink-0"
+                        style="background:${colors.badgeBg}; color:${item.color || '#1e293b'}">
+                    ${item.symbol.slice(0, 2)}
+                  </span>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        } else {
+          tile.innerHTML = `
+            <div class="h-full w-full p-3.5 flex flex-col justify-between">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="font-bold text-base sm:text-lg leading-tight tracking-tight truncate flex items-center gap-1.5"><span>${item.symbol}</span>${getLeverage(item) !== 1 ? `<span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-black/15">${getLeverage(item)}x</span>` : ''}</div>
+                  <div class="text-[11px] sm:text-xs opacity-80 truncate mt-0.5">${item.name || item.symbol}</div>
+                  <div class="mt-1.5 flex items-center gap-1.5 text-xs sm:text-sm font-bold" style="color:${colors.sub}">
+                    <span>${pctStr}</span>
+                    <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px]"
+                          style="background:${colors.text}; color:${colors.bg}">${arrow}</span>
+                  </div>
+                </div>
+                <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-extrabold shadow-xs"
+                     style="background:${colors.badgeBg}; color:${item.color || '#1e293b'}">
+                  ${item.symbol.slice(0, 2)}
+                </div>
+              </div>
+              <div class="flex items-baseline justify-between text-xs pt-1.5 border-t border-black/10">
+                <span class="font-bold text-sm">${priceStr}</span>
+                <span class="text-[11px] font-medium opacity-85">${sharesStr} · ${mvStr}</span>
+              </div>
+            </div>
+          `;
+        }
+
+        tile.addEventListener('mouseenter', (e) => showTooltip(e, item));
+        tile.addEventListener('mousemove', (e) => moveTooltip(e));
+        tile.addEventListener('mouseleave', hideTooltip);
+        tile.addEventListener('click', () => openDetailModal(item.symbol));
+
+        stageEl.appendChild(tile);
+      }
+
+      renderSummary();
+    }
+
+    function showTooltip(e, item) {
+      const totalMV = stocks.reduce((s, d) => s + getMarketValue(d), 0);
+      const mv = getMarketValue(item);
+      const weightPct = totalMV > 0 ? ((mv / totalMV) * 100).toFixed(1) : '0.0';
+      const pctVal = Number(item.pct || 0);
+
+      document.getElementById('tt-symbol').textContent = item.symbol;
+      const ttPct = document.getElementById('tt-pct');
+      ttPct.textContent = `${pctVal > 0 ? '+' : ''}${pctVal.toFixed(2)}%`;
+      const isUp = pctVal >= 0;
+      const green = usColorMode ? isUp : !isUp;
+      ttPct.className = `font-bold text-sm ${green ? 'text-emerald-400' : 'text-rose-400'}`;
+
+      document.getElementById('tt-name').textContent = item.name || item.symbol;
+      document.getElementById('tt-price').textContent = item.price != null
+        ? `${formatNativePrice(item)}${item.isLivePrice ? '' : ' (範例)'}`
+        : '--';
+      document.getElementById('tt-shares').textContent = `${formatShares(item.shares)} 股`;
+      document.getElementById('tt-weight').textContent = `${formatCurrency(mv)} (${weightPct}%)`;
+      document.getElementById('tt-range').textContent =
+        (item.low != null && item.high != null) ? `$${item.low.toFixed(2)} - $${item.high.toFixed(2)}` : '--';
+
+      tooltipEl.classList.remove('hidden');
+      moveTooltip(e);
+    }
+
+    function moveTooltip(e) {
+      const pad = 14;
+      let left = e.clientX + pad;
+      let top = e.clientY + pad;
+      const tw = tooltipEl.offsetWidth || 230;
+      const th = tooltipEl.offsetHeight || 120;
+      if (left + tw > window.innerWidth - 10) left = e.clientX - tw - pad;
+      if (top + th > window.innerHeight - 10) top = e.clientY - th - pad;
+      tooltipEl.style.left = `${left}px`;
+      tooltipEl.style.top = `${top}px`;
+    }
+
+    function hideTooltip() {
+      tooltipEl.classList.add('hidden');
+    }
+
+    // Detail Modal
+    const detailModal = document.getElementById('detail-modal');
+    function openDetailModal(symbol) {
+      const item = stocks.find(s => s.symbol === symbol);
+      if (!item) return;
+      selectedSymbol = symbol;
+
+      const pctVal = Number(item.pct || 0);
+      const isUp = pctVal >= 0;
+      const green = usColorMode ? isUp : !isUp;
+
+      document.getElementById('dm-symbol').textContent = item.symbol;
+      document.getElementById('dm-name').textContent = item.name || item.symbol;
+      const pctEl = document.getElementById('dm-pct');
+      pctEl.textContent = `${pctVal > 0 ? '+' : ''}${pctVal.toFixed(2)}%`;
+      pctEl.className = `px-2 py-0.5 rounded-md text-xs font-bold ${green ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`;
+
+      document.getElementById('dm-price').textContent = item.price != null
+        ? `${formatNativePrice(item)}${item.isLivePrice ? '' : ' (範例)'}`
+        : '--';
+      document.getElementById('dm-value').textContent = formatCurrency(getMarketValue(item));
+      document.getElementById('dm-change').textContent = item.change != null ? `${item.change >= 0 ? '+' : ''}${Number(item.change).toFixed(2)}` : '--';
+      document.getElementById('dm-hl').textContent = (item.high != null && item.low != null) ? `$${item.high.toFixed(2)} / $${item.low.toFixed(2)}` : '--';
+      document.getElementById('dm-pc').textContent = item.pc != null ? `$${item.pc.toFixed(2)}` : '--';
+
+      document.getElementById('dm-shares-input').value = item.shares;
+      document.getElementById('dm-leverage-select').value = String(getLeverage(item));
+      const yhSym = getCurrency(item) === 'TWD' && !item.symbol.includes('.') ? `${item.symbol}.TW` : item.symbol;
+      document.getElementById('dm-yahoo-link').href = `https://finance.yahoo.com/quote/${encodeURIComponent(yhSym)}`;
+      detailModal.classList.remove('hidden');
+    }
+
+    document.getElementById('dm-close').addEventListener('click', () => detailModal.classList.add('hidden'));
+    detailModal.addEventListener('click', (e) => { if (e.target === detailModal) detailModal.classList.add('hidden'); });
+
+    document.getElementById('dm-shares-dec').addEventListener('click', () => {
+      const inp = document.getElementById('dm-shares-input');
+      const cur = parseFloat(inp.value) || 0;
+      inp.value = Math.max(0, Number((cur - 1).toFixed(4)));
+    });
+
+    document.getElementById('dm-shares-inc').addEventListener('click', () => {
+      const inp = document.getElementById('dm-shares-input');
+      const cur = parseFloat(inp.value) || 0;
+      inp.value = Number((cur + 1).toFixed(4));
+    });
+
+    document.getElementById('dm-leverage-select').addEventListener('change', (e) => {
+      if (!selectedSymbol) return;
+      const item = stocks.find(s => s.symbol === selectedSymbol);
+      if (item) {
+        item.leverage = parseFloat(e.target.value) || 1;
+        saveStocks();
+        renderTreemap(new Set([item.symbol]));
+      }
+    });
+
+    document.getElementById('dm-save-shares').addEventListener('click', () => {
+      const val = parseFloat(document.getElementById('dm-shares-input').value);
+      if (!isNaN(val) && val >= 0 && selectedSymbol) {
+        const item = stocks.find(s => s.symbol === selectedSymbol);
+        if (item) {
+          item.shares = val;
+          saveStocks();
+          renderTreemap(new Set([item.symbol]));
+        }
+        detailModal.classList.add('hidden');
+      syncNewsWithHoldings();
+      }
+    });
+
+    document.getElementById('dm-remove').addEventListener('click', () => {
+      if (selectedSymbol) {
+        stocks = stocks.filter(s => s.symbol !== selectedSymbol);
+        saveStocks();
+        renderTreemap();
+        detailModal.classList.add('hidden');
+      syncNewsWithHoldings();
+      }
+    });
+
+    // Portfolio Manager Modal
+    const manageModal = document.getElementById('manage-modal');
+    function renderManageTable() {
+      const tbody = document.getElementById('mm-tbody');
+      tbody.innerHTML = '';
+      stocks.forEach(item => {
+        const tr = document.createElement('tr');
+        const pctVal = Number(item.pct || 0);
+        const green = usColorMode ? pctVal >= 0 : pctVal < 0;
+        const mv = getMarketValue(item);
+        tr.innerHTML = `
+          <td class="py-2 font-bold text-slate-900">${item.symbol}</td>
+          <td class="py-2 text-slate-600 max-w-[140px] truncate">${item.name || ''}</td>
+          <td class="py-2">
+            <div class="flex items-center justify-center gap-1">
+              <button type="button" data-step="-1" data-sym="${item.symbol}"
+                class="mm-step w-6 h-6 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-700">−</button>
+              <input type="number" min="0" step="any" value="${item.shares}" data-sym="${item.symbol}"
+                class="mm-s-input w-16 px-1.5 py-0.5 text-center border border-slate-200 rounded text-xs font-semibold" />
+              <button type="button" data-step="1" data-sym="${item.symbol}"
+                class="mm-step w-6 h-6 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-700">+</button>
+            </div>
+          </td>
+          <td class="py-2 text-center">
+            <select data-lev="${item.symbol}" class="mm-lev-select px-1.5 py-0.5 border border-slate-200 rounded bg-white text-xs font-semibold">
+              ${[1, 2, 3, -1, -2, -3].map(v => `<option value="${v}" ${getLeverage(item) === v ? 'selected' : ''}>${v}x</option>`).join('')}
+            </select>
+          </td>
+          <td class="py-2 text-right">
+            <div class="font-semibold text-slate-900">${formatCurrency(mv)}</div>
+            <div class="text-[10px] text-slate-400">${formatNativePrice(item)}</div>
+          </td>
+          <td class="py-2 text-right font-semibold ${green ? 'text-emerald-600' : 'text-rose-600'}">
+            ${pctVal > 0 ? '+' : ''}${pctVal.toFixed(2)}%
+          </td>
+          <td class="py-2 text-right">
+            <button type="button" data-del="${item.symbol}" class="mm-del text-slate-400 hover:text-rose-600 px-1.5 font-medium">移除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('.mm-step').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const sym = e.currentTarget.dataset.sym;
+          const step = parseFloat(e.currentTarget.dataset.step);
+          const target = stocks.find(s => s.symbol === sym);
+          if (target) {
+            target.shares = Math.max(0, Number(((Number(target.shares) || 0) + step).toFixed(4)));
+            saveStocks();
+            renderManageTable();
+            renderTreemap(new Set([sym]));
+      syncNewsWithHoldings();
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.mm-s-input').forEach(inp => {
+        inp.addEventListener('change', (e) => {
+          const sym = e.target.dataset.sym;
+          const val = parseFloat(e.target.value);
+          if (!isNaN(val) && val >= 0) {
+            const target = stocks.find(s => s.symbol === sym);
+            if (target) {
+              target.shares = val;
+              saveStocks();
+              renderManageTable();
+              renderTreemap(new Set([sym]));
+      syncNewsWithHoldings();
+            }
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.mm-lev-select').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+          const sym = e.target.dataset.lev;
+          const target = stocks.find(s => s.symbol === sym);
+          if (target) {
+            target.leverage = parseFloat(e.target.value) || 1;
+            saveStocks();
+            renderTreemap(new Set([sym]));
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.mm-del').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const sym = e.currentTarget.dataset.del;
+          stocks = stocks.filter(s => s.symbol !== sym);
+          saveStocks();
+          renderManageTable();
+          renderTreemap();
+      syncNewsWithHoldings();
+        });
+      });
+    }
+
+    document.getElementById('btn-manage').addEventListener('click', () => {
+      renderManageTable();
+      manageModal.classList.remove('hidden');
+    });
+    document.getElementById('mm-close').addEventListener('click', () => manageModal.classList.add('hidden'));
+    document.getElementById('mm-done').addEventListener('click', () => manageModal.classList.add('hidden'));
+    manageModal.addEventListener('click', (e) => { if (e.target === manageModal) manageModal.classList.add('hidden'); });
+
+    document.getElementById('new-symbol').addEventListener('input', (e) => {
+      const sym = e.target.value.trim().toUpperCase().replace(/\.(TW|TWO)$/i, '');
+      const currSel = document.getElementById('new-currency');
+      const nameInp = document.getElementById('new-name');
+      const levSel = document.getElementById('new-leverage');
+      const priceInp = document.getElementById('new-price');
+      if (isTaiwanSymbol(sym)) {
+        currSel.value = 'TWD';
+        const info = KNOWN_TW_ETFS[sym];
+        if (info) {
+          if (!nameInp.value.trim()) nameInp.value = info.name;
+          levSel.value = String(info.lev);
+          if (!priceInp.value) priceInp.placeholder = String(info.price);
+        }
+      } else {
+        currSel.value = 'USD';
+      }
+    });
+
+    document.getElementById('add-ticker-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const sym = document.getElementById('new-symbol').value.trim().toUpperCase();
+      const name = document.getElementById('new-name').value.trim() || sym;
+      const shares = parseFloat(document.getElementById('new-shares').value);
+      const priceInput = parseFloat(document.getElementById('new-price').value);
+      const levVal = parseFloat(document.getElementById('new-leverage').value) || 1;
+      const currVal = document.getElementById('new-currency').value || (isTaiwanSymbol(sym) ? 'TWD' : 'USD');
+      const cleanSym = currVal === 'TWD' ? sym.replace(/\.(TW|TWO)$/i, '') : sym;
+      const twInfo = KNOWN_TW_ETFS[cleanSym];
+      const finalName = (name && name !== sym) ? name : (twInfo ? twInfo.name : cleanSym);
+      const defaultPrice = (!isNaN(priceInput) && priceInput > 0) ? priceInput : (twInfo ? twInfo.price : 100.00);
+      if (!cleanSym || isNaN(shares) || shares <= 0) return;
+
+      const existing = stocks.find(s => s.symbol === cleanSym);
+      if (existing) {
+        existing.shares = Number(((Number(existing.shares) || 0) + shares).toFixed(4));
+        if (finalName !== cleanSym) existing.name = finalName;
+        if (!isNaN(priceInput) && priceInput > 0) existing.price = priceInput;
+        existing.leverage = levVal;
+        existing.currency = currVal;
+      } else {
+        stocks.push({
+          symbol: cleanSym,
+          name: finalName,
+          shares,
+          leverage: levVal,
+          currency: currVal,
+          price: defaultPrice,
+          isLivePrice: false,
+          pct: 0,
+          change: null,
+          high: null,
+          low: null,
+          pc: null,
+          color: currVal === 'TWD' ? '#0f766e' : '#334155'
+        });
+      }
+      saveStocks();
+      document.getElementById('new-symbol').value = '';
+      document.getElementById('new-name').value = '';
+      document.getElementById('new-price').value = '';
+      document.getElementById('new-price').placeholder = '選填';
+      renderManageTable();
+      renderTreemap(new Set([cleanSym]));
+      if (currVal === 'TWD') fetchTwseQuotes();
+      else if (hasActiveQuotesAuth()) fetchAllQuotes();
+      syncNewsWithHoldings(cleanSym);
+    });
+
+    document.getElementById('mm-reset').addEventListener('click', () => {
+      stocks = JSON.parse(JSON.stringify(DEFAULT_STOCKS));
+      saveStocks();
+      renderManageTable();
+      renderTreemap();
+      if (hasActiveQuotesAuth()) fetchAllQuotes();
+      syncNewsWithHoldings();
+    });
+
+    function saveStocks() {
+      safeSetStorage(STORAGE_KEY_STOCKS, JSON.stringify(stocks));
+    }
+
+    // Color mode toggle
+    const colorBtn = document.getElementById('btn-color-mode');
+    function updateColorBtn() {
+      colorBtn.textContent = usColorMode ? '美股配色 (紅跌綠漲)' : '台股配色 (紅漲綠跌)';
+    }
+    updateColorBtn();
+    colorBtn.addEventListener('click', () => {
+      usColorMode = !usColorMode;
+      safeSetStorage(STORAGE_KEY_COLOR, usColorMode ? 'us' : 'tw');
+      updateColorBtn();
+      renderTreemap();
+    });
+
+    // API Modal & Provider Switching
+    const apiModal = document.getElementById('api-modal');
+    const apiInput = document.getElementById('api-key-input');
+    const alpacaIdInput = document.getElementById('alpaca-key-input');
+    const alpacaSecInput = document.getElementById('alpaca-secret-input');
+    const fugleInput = document.getElementById('fugle-key-input');
+    const tabAlpaca = document.getElementById('am-tab-alpaca');
+    const tabFinnhub = document.getElementById('am-tab-finnhub');
+    const tabFugle = document.getElementById('am-tab-fugle');
+    const panelAlpaca = document.getElementById('am-panel-alpaca');
+    const panelFinnhub = document.getElementById('am-panel-finnhub');
+    const panelFugle = document.getElementById('am-panel-fugle');
+
+    function setModalProvider(prov) {
+      modalProvider = prov;
+      const activeCls = 'py-1.5 rounded-lg bg-white text-slate-900 shadow-xs transition';
+      const idleCls = 'py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+      tabAlpaca.className = prov === 'alpaca' ? activeCls : idleCls;
+      tabFinnhub.className = prov === 'finnhub' ? activeCls : idleCls;
+      tabFugle.className = prov === 'fugle' ? activeCls : idleCls;
+      panelAlpaca.classList.toggle('hidden', prov !== 'alpaca');
+      panelFinnhub.classList.toggle('hidden', prov !== 'finnhub');
+      panelFugle.classList.toggle('hidden', prov !== 'fugle');
+    }
+
+    tabAlpaca.addEventListener('click', () => setModalProvider('alpaca'));
+    tabFinnhub.addEventListener('click', () => setModalProvider('finnhub'));
+    tabFugle.addEventListener('click', () => setModalProvider('fugle'));
+
+    document.getElementById('btn-api-modal').addEventListener('click', () => {
+      apiInput.value = apiKey;
+      alpacaIdInput.value = alpacaKeyId;
+      alpacaSecInput.value = alpacaSecret;
+      fugleInput.value = fugleKey;
+      setModalProvider(activeProvider);
+      apiModal.classList.remove('hidden');
+    });
+    document.getElementById('am-close').addEventListener('click', () => apiModal.classList.add('hidden'));
+    document.getElementById('am-cancel').addEventListener('click', () => apiModal.classList.add('hidden'));
+    apiModal.addEventListener('click', (e) => { if (e.target === apiModal) apiModal.classList.add('hidden'); });
+
+    document.getElementById('am-save').addEventListener('click', () => {
+      if (modalProvider === 'alpaca') {
+        const kid = alpacaIdInput.value.trim();
+        const ksec = alpacaSecInput.value.trim();
+        if (!kid || !ksec) return;
+        alpacaKeyId = kid;
+        alpacaSecret = ksec;
+        activeProvider = 'alpaca';
+        safeSetStorage(STORAGE_KEY_ALPACA_ID, kid);
+        safeSetStorage(STORAGE_KEY_ALPACA_SEC, ksec);
+        safeSetStorage(STORAGE_KEY_PROVIDER, 'alpaca');
+      } else if (modalProvider === 'finnhub') {
+        const val = apiInput.value.trim();
+        if (!val) return;
+        apiKey = val;
+        activeProvider = 'finnhub';
+        safeSetStorage(STORAGE_KEY_API, apiKey);
+        safeSetStorage(STORAGE_KEY_PROVIDER, 'finnhub');
+      } else {
+        const fval = fugleInput.value.trim();
+        if (!fval) return;
+        fugleKey = fval;
+        safeSetStorage(STORAGE_KEY_FUGLE, fugleKey);
+      }
+      stopDemoLive();
+      apiModal.classList.add('hidden');
+      updateStatusUI();
+      startPolling();
+      fetchAllQuotes();
+      if (activeProvider === 'finnhub') fetchHoldingsNews();
+    });
+
+    document.getElementById('am-clear').addEventListener('click', () => {
+      apiKey = '';
+      alpacaKeyId = '';
+      alpacaSecret = '';
+      fugleKey = '';
+      safeRemoveStorage(STORAGE_KEY_FUGLE);
+      safeRemoveStorage(STORAGE_KEY_API);
+      safeRemoveStorage(STORAGE_KEY_ALPACA_ID);
+      safeRemoveStorage(STORAGE_KEY_ALPACA_SEC);
+      safeRemoveStorage(STORAGE_KEY_PROVIDER);
+      stopPolling();
+      apiModal.classList.add('hidden');
+      errorBanner.classList.add('hidden');
+      updateStatusUI();
+      fetchGdeltLiveNews();
+    });
+
+    // Demo Live Simulation
+    const demoBtn = document.getElementById('btn-demo-live');
+    const demoDot = document.getElementById('demo-dot');
+    function stopDemoLive() {
+      demoLive = false;
+      if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+      demoDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-400';
+      demoBtn.classList.remove('border-emerald-300', 'bg-emerald-50', 'text-emerald-700');
+    }
+
+    demoBtn.addEventListener('click', () => {
+      if (demoLive) {
+        stopDemoLive();
+        updateStatusUI();
+        return;
+      }
+      if (hasActiveQuotesAuth()) stopPolling();
+      demoLive = true;
+      demoDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
+      demoBtn.classList.add('border-emerald-300', 'bg-emerald-50', 'text-emerald-700');
+      updateStatusUI();
+
+      demoTimer = setInterval(() => {
+        const changed = new Set();
+        stocks.forEach(s => {
+          if (Math.random() < 0.45) {
+            const deltaPct = (Math.random() - 0.48) * 0.45;
+            s.pct = Number((s.pct + deltaPct).toFixed(2));
+            if (s.price) {
+              s.price = Number((s.price * (1 + deltaPct / 100)).toFixed(2));
+            }
+            changed.add(s.symbol);
+          }
+        });
+        const now = new Date();
+        lastUpdatedEl.textContent = `模擬更新 ${now.toLocaleTimeString('zh-TW', { hour12: false })}`;
+        renderTreemap(changed);
+      }, 2500);
+    });
+
+    // Live USD/TWD Exchange Rate (Keyless via open.er-api.com)
+    async function fetchFxRate() {
+      const fxEl = document.getElementById('fx-live-val');
+      try {
+        const res = await fetch('https://open.er-api.com/v6/latest/USD');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.rates && typeof data.rates.TWD === 'number') {
+            usdTwdRate = data.rates.TWD;
+            if (fxEl) fxEl.textContent = usdTwdRate.toFixed(2);
+            renderTreemap();
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Taiwan Stock / ETF Quotes: Fugle Intraday Real-Time (when key set) + TWSE OpenAPI fallback
+    async function fetchTwseQuotes() {
+      const twStocks = stocks.filter(s => getCurrency(s) === 'TWD');
+      if (twStocks.length === 0) return;
+
+      if (fugleKey) {
+        const changed = new Set();
+        let okCount = 0;
+        for (let i = 0; i < twStocks.length; i++) {
+          const item = twStocks[i];
+          const code = item.symbol.replace(/\.(TW|TWO)$/i, '').trim();
+          try {
+            const url = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${encodeURIComponent(code)}`;
+            const res = await fetch(url, {
+              headers: { 'X-API-KEY': fugleKey, 'Accept': 'application/json' }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const latest = data && (data.lastPrice || data.closePrice || data.previousClose);
+              if (typeof latest === 'number' && latest > 0) {
+                if (item.price !== latest) changed.add(item.symbol);
+                item.price = latest;
+                item.isLivePrice = true;
+                item.change = typeof data.change === 'number' ? Number(data.change.toFixed(2)) : item.change;
+                item.pct = typeof data.changePercent === 'number' ? Number(data.changePercent.toFixed(2)) : item.pct;
+                item.high = data.highPrice || item.high;
+                item.low = data.lowPrice || item.low;
+                item.pc = data.previousClose || item.pc;
+                okCount++;
+              }
+            }
+          } catch (e) {}
+          if (i < twStocks.length - 1) await new Promise(r => setTimeout(r, 60));
+        }
+        if (okCount > 0) {
+          saveStocks();
+          const now = new Date();
+          lastUpdatedEl.textContent = `即時更新 ${now.toLocaleTimeString('zh-TW', { hour12: false })}`;
+          renderTreemap(changed);
+          if (!manageModal.classList.contains('hidden')) renderManageTable();
+          return;
+        }
+      }
+      try {
+        const res = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows)) {
+            const byCode = new Map();
+            rows.forEach(r => { if (r && r.Code) byCode.set(r.Code.trim(), r); });
+            const changed = new Set();
+            twStocks.forEach(item => {
+              const code = item.symbol.replace(/\.(TW|TWO)$/i, '').trim();
+              const row = byCode.get(code);
+              if (row && row.ClosingPrice) {
+                const close = parseFloat(String(row.ClosingPrice).replace(/,/g, ''));
+                const chg = parseFloat(String(row.Change || '0').replace(/,/g, '')) || 0;
+                if (!isNaN(close) && close > 0) {
+                  const prev = close - chg;
+                  const pct = prev > 0 ? (chg / prev) * 100 : 0;
+                  if (item.price !== close) changed.add(item.symbol);
+                  item.price = close;
+                  item.isLivePrice = true;
+                  item.change = Number(chg.toFixed(2));
+                  item.pct = Number(pct.toFixed(2));
+                }
+              }
+            });
+            if (changed.size > 0) {
+              saveStocks();
+              renderTreemap(changed);
+              if (!manageModal.classList.contains('hidden')) renderManageTable();
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    const dispCurrBtn = document.getElementById('btn-display-currency');
+    if (dispCurrBtn) {
+      dispCurrBtn.textContent = displayCurrency;
+      dispCurrBtn.addEventListener('click', () => {
+        displayCurrency = displayCurrency === 'USD' ? 'TWD' : 'USD';
+        safeSetStorage(STORAGE_KEY_DISPLAY_CURR, displayCurrency);
+        dispCurrBtn.textContent = displayCurrency;
+        renderTreemap();
+        if (!manageModal.classList.contains('hidden')) renderManageTable();
+      });
+    }
+
+    // 24H BTC Live Price (Keyless via CoinGecko)
+    async function fetchBtcLive() {
+      const valEl = document.getElementById('btc-live-val');
+      if (!valEl) return;
+      try {
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.bitcoin && typeof data.bitcoin.usd === 'number') {
+            const p = data.bitcoin.usd;
+            const chg = Number(data.bitcoin.usd_24h_change || 0);
+            const green = usColorMode ? chg >= 0 : chg < 0;
+            valEl.textContent = `$${p.toLocaleString('en-US', { maximumFractionDigits: 0 })} (${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%)`;
+            valEl.className = green ? 'text-emerald-600' : 'text-rose-600';
+
+            // If user isn't connected to Finnhub/Alpaca yet, keep FBTC synced to 24h BTC move
+            if (!hasActiveQuotesAuth()) {
+              const fbtc = stocks.find(s => s.symbol === 'FBTC');
+              if (fbtc) {
+                fbtc.pct = Number(chg.toFixed(2));
+                renderTreemap();
+              }
+            }
+            return;
+          }
+        }
+      } catch (e) {}
+      valEl.textContent = '暫無連線';
+    }
+
+    // Live Quotes Fetch (Alpaca Pre/After-hours OR Finnhub Regular)
+    async function fetchAllQuotes() {
+      if (!hasActiveQuotesAuth() || isFetching) return;
+      isFetching = true;
+      refreshIcon.classList.add('animate-spin');
+      errorBanner.classList.add('hidden');
+
+      const changed = new Set();
+      let successCount = 0;
+      let authError = false;
+      let rateLimited = false;
+
+      if (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret) {
+        try {
+          const usStocks = stocks.filter(s => getCurrency(s) === 'USD');
+          const symbolsCsv = usStocks.map(s => encodeURIComponent(s.symbol)).join(',');
+          const url = `https://data.alpaca.markets/v2/stocks/snapshots?symbols=${symbolsCsv}`;
+          const res = await fetch(url, {
+            headers: {
+              'APCA-API-KEY-ID': alpacaKeyId,
+              'APCA-API-SECRET-KEY': alpacaSecret,
+              'Accept': 'application/json'
+            }
+          });
+          if (res.status === 401 || res.status === 403) {
+            authError = true;
+          } else if (res.status === 429) {
+            rateLimited = true;
+          } else if (res.ok) {
+            const data = await res.json();
+            for (const item of stocks) {
+              const snap = data && data[item.symbol];
+              if (snap && snap.latestTrade && typeof snap.latestTrade.p === 'number') {
+                const latest = snap.latestTrade.p;
+                const prevClose = (snap.prevDailyBar && snap.prevDailyBar.c) || (snap.dailyBar && snap.dailyBar.o) || item.pc || latest;
+                const chg = latest - prevClose;
+                const pct = prevClose > 0 ? (chg / prevClose) * 100 : 0;
+                if (item.price !== latest) changed.add(item.symbol);
+                item.price = latest;
+                item.isLivePrice = true;
+                item.change = Number(chg.toFixed(2));
+                item.pct = Number(pct.toFixed(2));
+                item.high = snap.dailyBar ? snap.dailyBar.h : item.high;
+                item.low = snap.dailyBar ? snap.dailyBar.l : item.low;
+                item.pc = prevClose;
+                successCount++;
+              }
+            }
+          }
+        } catch (err) {}
+      } else {
+        for (let i = 0; i < stocks.length; i++) {
+          const item = stocks[i];
+          if (getCurrency(item) === 'TWD') continue;
+          try {
+            const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(item.symbol)}&token=${encodeURIComponent(apiKey)}`;
+            const res = await fetch(url);
+            if (res.status === 401 || res.status === 403) {
+              authError = true;
+              break;
+            }
+            if (res.status === 429) {
+              rateLimited = true;
+              break;
+            }
+            if (res.ok) {
+              const data = await res.json();
+              if (data && typeof data.c === 'number' && data.c > 0) {
+                if (item.price !== data.c) changed.add(item.symbol);
+                item.price = data.c;
+                item.isLivePrice = true;
+                item.change = data.d;
+                item.pct = data.dp != null ? Number(data.dp.toFixed(2)) : item.pct;
+                item.high = data.h;
+                item.low = data.l;
+                item.pc = data.pc;
+                successCount++;
+              }
+            }
+          } catch (err) {}
+          if (i < stocks.length - 1) {
+            await new Promise(r => setTimeout(r, 65));
+          }
+        }
+      }
+
+      isFetching = false;
+      refreshIcon.classList.remove('animate-spin');
+
+      if (authError) {
+        errorBanner.textContent = activeProvider === 'alpaca'
+          ? 'Alpaca API Key / Secret 無效，請檢查金鑰設定。'
+          : 'Finnhub API Key 無效或已過期，請檢查金鑰設定。';
+        errorBanner.classList.remove('hidden');
+        stopPolling();
+      } else if (rateLimited) {
+        errorBanner.textContent = '觸及 API 查詢頻率上限，建議將更新頻率調為「每 60 秒」。';
+        errorBanner.classList.remove('hidden');
+      } else if (successCount > 0) {
+        saveStocks();
+        const now = new Date();
+        lastUpdatedEl.textContent = `即時更新 ${now.toLocaleTimeString('zh-TW', { hour12: false })}`;
+        renderTreemap(changed);
+        if (!manageModal.classList.contains('hidden')) renderManageTable();
+        renderNewsFilters();
+        if (activeProvider === 'finnhub' && Date.now() - lastNewsFetchMs > 90000) fetchHoldingsNews();
+      } else if ((activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret) || (activeProvider === 'finnhub' && apiKey)) {
+        errorBanner.textContent = '無法取得美股報價，請確認網路連線或 API 金鑰。';
+        errorBanner.classList.remove('hidden');
+      }
+      updateStatusUI();
+      fetchFxRate();
+      fetchTwseQuotes();
+      fetchTwseQuotes();
+      fetchBtcLive();
+    }
+
+    function updateStatusUI() {
+      const apiBtnLabel = document.getElementById('api-btn-label');
+      if (hasActiveQuotesAuth()) {
+        statusDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        const usLabel = (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret)
+          ? 'Alpaca 美股'
+          : (apiKey ? 'Finnhub 美股' : '');
+        const twLabel = fugleKey ? 'Fugle 台股即時' : '';
+        statusText.textContent = [usLabel, twLabel].filter(Boolean).join(' + ') || '即時連線';
+        apiBtnLabel.textContent = '已連線 API';
+      } else if (demoLive) {
+        statusDot.className = 'w-2 h-2 rounded-full bg-blue-500 animate-pulse';
+        statusText.textContent = '模擬即時跳動';
+        apiBtnLabel.textContent = '設定即時 API';
+      } else {
+        statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        statusText.textContent = '範例快照';
+        apiBtnLabel.textContent = '設定即時 API';
+      }
+    }
+
+    function stopPolling() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      countdownLabel.textContent = '更新';
+    }
+
+    function startPolling() {
+      stopPolling();
+      if (!hasActiveQuotesAuth()) return;
+      const intervalSec = parseInt(document.getElementById('select-interval').value, 10);
+      if (!intervalSec || intervalSec <= 0) {
+        countdownLabel.textContent = '手動更新';
+        return;
+      }
+
+      countdownSeconds = intervalSec;
+      countdownLabel.textContent = `${countdownSeconds}s`;
+
+      countdownTimer = setInterval(() => {
+        countdownSeconds--;
+        if (countdownSeconds <= 0) {
+          countdownSeconds = intervalSec;
+          fetchAllQuotes();
+        }
+        countdownLabel.textContent = `${countdownSeconds}s`;
+      }, 1000);
+    }
+
+    document.getElementById('select-interval').addEventListener('change', () => {
+      if (hasActiveQuotesAuth()) startPolling();
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', () => {
+      if (hasActiveQuotesAuth()) {
+        const intervalSec = parseInt(document.getElementById('select-interval').value, 10);
+        if (intervalSec > 0) countdownSeconds = intervalSec;
+        fetchAllQuotes();
+      } else {
+        document.getElementById('btn-api-modal').click();
+      }
+    });
+
+    let resizeTimeout = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => renderTreemap(), 120);
+    });
+
+    // Holdings News Engine
+    const DEMO_NEWS = [
+      {
+        symbol: 'QQQ', source: 'MarketWatch', datetime: Math.floor(Date.now() / 1000) - 900,
+        headlineZh: '利率預期牽動科技權值股回檔，QQQ 指數承壓整理',
+        summaryZh: '投資人重新評估總體經濟數據與美債殖利率走勢，大型科技股短線出現獲利了結賣壓。',
+        contentZh: '美股科技權值股今日普遍承壓，追蹤那斯達克 100 指數的 QQQ 隨之走低。市場分析師指出，近期公債殖利率反彈加上部分資金在財報季前先行獲利了結，使高估值成長股短線波動加劇。\n\n不過，機構法人仍普遍認為大型科技股的現金流與 AI 資本支出循環具韌性，短線拉回主要屬於評價面修正而非基本面反轉。',
+        headline: 'Nasdaq-100 Tech Heavyweights Weigh on QQQ Amid Rate Expectations',
+        summary: 'Large-cap technology names pulled back slightly as investors reassessed upcoming macro data and Treasury yields.',
+        url: 'https://finance.yahoo.com/quote/QQQ'
+      },
+      {
+        symbol: 'NVDA', source: 'Reuters', datetime: Math.floor(Date.now() / 1000) - 1800,
+        headlineZh: '資料中心需求維持強勁，輝達次世代架構出貨能見度高',
+        summaryZh: '雲端巨頭持續擴大 AI 基礎建設資本支出，支撐高階 GPU 長期訂單與算力需求。',
+        contentZh: '根據供應鏈最新訪查，北美四大雲端服務商（CSP）對次世代 AI 加速器的採購動能並未放緩，輝達（NVIDIA）高階資料中心晶片在未來數季的產能利用率仍維持滿載。\n\n法人關注即將公布的單季財報與毛利率指引，並評估新型機櫃級系統放量對營收認列節奏的影響。',
+        headline: 'NVIDIA Data Center Demand Remains Strong Ahead of Next-Gen Architecture Ramp',
+        summary: 'Cloud hyperscalers continue expanding AI infrastructure commitments, supporting long-term GPU shipment visibility.',
+        url: 'https://finance.yahoo.com/quote/NVDA'
+      },
+      {
+        symbol: 'TSLA', source: 'Bloomberg', datetime: Math.floor(Date.now() / 1000) - 3200,
+        headlineZh: '特斯拉擴大自駕車隊測試，市場持續關注電動車毛利率表現',
+        summaryZh: '投資人聚焦交車動能、儲能業務成長以及全自動輔助駕駛軟體的後續推進。',
+        contentZh: '特斯拉（Tesla）持續在美國多州推進自動駕駛測試與 FSD 軟體更新，同時儲能事業（Megapack）出貨量保持高速成長。\n\n雖然電動車產業價格競爭仍使整車毛利率面臨考驗，但多頭機構看好 AI 訓練算力與自駕商業化將成為中長期估值重估的核心催化劑。',
+        headline: 'Tesla Expands Autonomous Fleet Testing While EV Margins Stay in Focus',
+        summary: 'Investors are tracking delivery momentum and energy storage growth alongside autonomous software updates.',
+        url: 'https://finance.yahoo.com/quote/TSLA'
+      },
+      {
+        symbol: 'MSFT', source: 'CNBC', datetime: Math.floor(Date.now() / 1000) - 5400,
+        headlineZh: '微軟 Azure AI 服務帶動企業雲端採用率持續攀升',
+        summaryZh: '企業軟體預算持續向整合式 AI Copilot 與雲端運算工作負載轉移。',
+        contentZh: '微軟（Microsoft）指出，越來越多企業客戶將生成式 AI 工具導入日常辦公與開發流程，帶動 Azure 雲端平台與 Microsoft 365 Copilot 付費席次穩定成長。\n\n市場關注其資料中心折舊費用增加與雲端營收成長之間的平衡表現。',
+        headline: 'Microsoft Azure AI Services Drive Enterprise Cloud Adoption',
+        summary: 'Enterprise software spending continues to shift toward integrated AI copilots and cloud workloads.',
+        url: 'https://finance.yahoo.com/quote/MSFT'
+      },
+      {
+        symbol: 'AMZN', source: 'WSJ', datetime: Math.floor(Date.now() / 1000) - 7200,
+        headlineZh: '亞馬遜 AWS 與零售物流效率提升，推升營運獲利展望',
+        summaryZh: '區域化倉儲配送網路與雲端業務需求，持續扮演營業利益率擴張的核心動能。',
+        contentZh: '亞馬遜（Amazon）近年推動的區域化物流配送架構持續降低單件履約成本，搭配高毛利的廣告業務與 AWS 雲端運算回溫，使整體營業利益率維持在近年高檔區間。',
+        headline: 'Amazon AWS and Retail Logistics Efficiency Boost Operating Outlook',
+        summary: 'Regionalized fulfillment networks and cloud demand remain central drivers of margin expansion.',
+        url: 'https://finance.yahoo.com/quote/AMZN'
+      },
+      {
+        symbol: 'PLTR', source: 'Barron\'s', datetime: Math.floor(Date.now() / 1000) - 10800,
+        headlineZh: 'Palantir 商業 AI 平台再獲多筆企業級合約青睞',
+        summaryZh: '美國商業客戶營收年增率持續超越傳統政府部門業務，成為主要成長引擎。',
+        contentZh: '帕蘭泰爾（Palantir）旗下 AIP 人工智慧平台透過密集的企業實作訓練營，成功縮短大型客戶的採購導入週期，美國商業客戶數與合約總值持續加速成長。',
+        headline: 'Palantir Commercial AI Platform Wins Additional Enterprise Contracts',
+        summary: 'US commercial customer growth continues to outpace legacy government segment expansion.',
+        url: 'https://finance.yahoo.com/quote/PLTR'
+      },
+      {
+        symbol: 'GOOG', source: 'TechCrunch', datetime: Math.floor(Date.now() / 1000) - 14400,
+        headlineZh: 'Alphabet 將新版 Gemini 功能全面整合至搜尋與 Workspace',
+        summaryZh: '搜尋廣告韌性與 Google Cloud 獲利能力穩健，為單季營運提供支撐。',
+        contentZh: 'Alphabet 持續擴大 Gemini 模型在核心搜尋與雲端服務的應用深度，AI 摘要功能帶動用戶查詢互動率提升，同時 Google Cloud 營益率亦呈現逐季改善。',
+        headline: 'Alphabet Integrates New Gemini Capabilities Across Search and Workspace',
+        summary: 'Search advertising resilience and Google Cloud profitability underpin Alphabet\'s quarterly trajectory.',
+        url: 'https://finance.yahoo.com/quote/GOOG'
+      },
+      {
+        symbol: 'META', source: 'Financial Times', datetime: Math.floor(Date.now() / 1000) - 18000,
+        headlineZh: 'Meta 強化 AI 廣告精準投放，推升 Reels 商業變現表現',
+        summaryZh: 'AI 推薦演算法持續拉高用戶黏著度與廣告主投資報酬率。',
+        contentZh: 'Meta 運用大型推薦模型優化 Instagram Reels 與 Facebook 動態消息的廣告轉換率，帶動平均廣告單價與曝光次數同步走揚，為公司投入 AI 運算資源提供充沛現金流。',
+        headline: 'Meta Ad Targeting Improvements Lift Monetization Across Reels',
+        summary: 'AI-driven recommendation models continue increasing user engagement and advertiser return on spend.',
+        url: 'https://finance.yahoo.com/quote/META'
+      },
+      {
+        symbol: 'AAPL', source: '9to5Mac', datetime: Math.floor(Date.now() / 1000) - 21600,
+        headlineZh: '蘋果服務業務營收再創里程碑，生態系黏著度穩固',
+        summaryZh: '高毛利訂閱服務與穿戴裝置有助於平滑硬體換機週期波動。',
+        contentZh: '蘋果（Apple）App Store、iCloud 與 Apple Pay 等服務事業維持雙位數年增，搭配全球超過 22 億台活躍裝置基數，持續為整體毛利率提供穩定支撐。',
+        headline: 'Apple Services Revenue Reaches New Milestone Amid Ecosystem Growth',
+        summary: 'High-margin services and wearables help stabilize hardware replacement cycles.',
+        url: 'https://finance.yahoo.com/quote/AAPL'
+      }
+    ];
+
+    let newsFilterSymbol = 'ALL';
+    let newsLangZh = true;
+    let newsItems = [...DEMO_NEWS];
+    let lastNewsFetchMs = 0;
+    let isFetchingNews = false;
+    const translationCache = new Map();
+
+    async function translateToZhTW(text) {
+      const clean = String(text || '').trim();
+      if (!clean) return '';
+      if (/[一-鿿]/.test(clean)) return clean;
+      if (translationCache.has(clean)) return translationCache.get(clean);
+
+      // Primary: public Google Translate endpoint
+      try {
+        const gUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-TW&dt=t&q=${encodeURIComponent(clean)}`;
+        const res = await fetch(gUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && Array.isArray(data[0])) {
+            const translated = data[0].map(seg => seg[0] || '').join('');
+            if (translated) {
+              translationCache.set(clean, translated);
+              return translated;
+            }
+          }
+        }
+      } catch (e) {}
+
+      // Fallback: MyMemory CORS API
+      try {
+        const mUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean.slice(0, 450))}&langpair=en|zh-TW`;
+        const res = await fetch(mUrl);
+        if (res.ok) {
+          const data = await res.json();
+          const translated = data && data.responseData && data.responseData.translatedText;
+          if (translated) {
+            translationCache.set(clean, translated);
+            return translated;
+          }
+        }
+      } catch (e) {}
+
+      return clean;
+    }
+
+    async function translateVisibleLiveNews(list) {
+      let updated = false;
+      for (const item of list) {
+        if (!newsLangZh) break;
+        if (!item.headlineZh && item.headline) {
+          item.headlineZh = await translateToZhTW(item.headline);
+          updated = true;
+        }
+        if (!item.summaryZh && item.summary) {
+          item.summaryZh = await translateToZhTW(item.summary);
+          updated = true;
+        }
+      }
+      if (updated) renderNewsGrid(false);
+    }
+
+    const SYMBOL_QUERY_MAP = {
+      QQQ: '(QQQ OR Nasdaq)',
+      IVV: '(S&P 500 OR IVV)',
+      MSFT: '(Microsoft OR MSFT)',
+      TSLA: '(Tesla OR TSLA)',
+      AMZN: '(Amazon OR AMZN)',
+      PLTR: '(Palantir OR PLTR)',
+      META: '("Meta Platforms" OR Facebook)',
+      SPCX: '(SpaceX OR Starship)',
+      GOOG: '(Alphabet OR Google)',
+      NVDA: '(NVIDIA OR NVDA)',
+      TQQQ: '(TQQQ OR Nasdaq)',
+      FBTC: '(Bitcoin OR FBTC)',
+      SE: '("Sea Limited" OR Shopee)',
+      NVDL: '(NVIDIA OR NVDL)',
+      GGLL: '(Alphabet OR Google)',
+      AAPL: '(Apple OR AAPL)',
+      UPRO: '(S&P 500 OR UPRO)',
+      U: '("Unity Software")',
+      TSLL: '(Tesla OR TSLL)',
+      FLG: '(Flagstar)',
+      TDOC: '(Teladoc)'
+    };
+
+    function parseGdeltDate(seendate) {
+      // Format: YYYYMMDDTHHMMSSZ
+      const m = String(seendate || '').match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+      if (!m) return Math.floor(Date.now() / 1000);
+      return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000);
+    }
+
+    function getHeldSymbols() {
+      return [...stocks]
+        .filter(s => (Number(s.shares) || 0) > 0)
+        .sort((a, b) => getMarketValue(b) - getMarketValue(a))
+        .map(s => s.symbol);
+    }
+
+    function buildSymbolQuery(sym) {
+      if (SYMBOL_QUERY_MAP[sym]) return SYMBOL_QUERY_MAP[sym];
+      const item = stocks.find(s => s.symbol === sym);
+      const name = item && item.name && item.name !== sym ? item.name : '';
+      return name ? `("${name}" OR ${sym})` : sym;
+    }
+
+    function matchSymbolFromTitle(title, candidateSymbols) {
+      const t = String(title || '').toLowerCase();
+      const kwMap = {
+        NVDA: ['nvidia', 'nvda'],
+        NVDL: ['nvidia', 'nvdl'],
+        TSLA: ['tesla', 'tsla'],
+        TSLL: ['tesla', 'tsll'],
+        MSFT: ['microsoft', 'msft'],
+        AMZN: ['amazon', 'amzn', 'aws'],
+        AAPL: ['apple', 'aapl'],
+        GOOG: ['alphabet', 'google', 'goog'],
+        GGLL: ['alphabet', 'google', 'ggll'],
+        META: ['meta', 'instagram', 'facebook'],
+        PLTR: ['palantir', 'pltr'],
+        SPCX: ['spacex', 'starship', 'spcx'],
+        QQQ:  ['nasdaq', 'qqq'],
+        TQQQ: ['nasdaq', 'tqqq'],
+        IVV:  ['s&p 500', 'ivv'],
+        UPRO: ['s&p 500', 'upro'],
+        FBTC: ['bitcoin', 'fbtc'],
+        SE:   ['sea limited', 'shopee'],
+        U:    ['unity software'],
+        FLG:  ['flagstar'],
+        TDOC: ['teladoc']
+      };
+      for (const sym of candidateSymbols) {
+        const item = stocks.find(s => s.symbol === sym);
+        const kws = [...(kwMap[sym] || [sym.toLowerCase()])];
+        if (item && item.name && item.name.length >= 2) kws.push(item.name.toLowerCase());
+        if (kws.some(k => t.includes(k))) return sym;
+      }
+      return null;
+    }
+
+    async function fetchGdeltLiveNews(explicitSymbol = null) {
+      if (isFetchingNews) return;
+      const heldSymbols = getHeldSymbols();
+      if (heldSymbols.length === 0) {
+        newsItems = [];
+        renderNewsFilters();
+        renderNewsGrid();
+        return;
+      }
+
+      isFetchingNews = true;
+      const icon = document.getElementById('news-refresh-icon');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        const querySyms = explicitSymbol ? [explicitSymbol] : heldSymbols.slice(0, 10);
+        const combinedQuery = querySyms.map(buildSymbolQuery).join(' OR ');
+        const hasTw = querySyms.some(s => isTaiwanSymbol(s));
+        const terms = hasTw && querySyms.length === 1 ? `(${combinedQuery})` : `(${combinedQuery}) sourcelang:eng`;
+
+        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(terms)}&mode=ArtList&maxrecords=30&timespan=5d&sort=DateDesc&format=json`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.articles) && data.articles.length > 0) {
+            const seen = new Set();
+            const fetched = [];
+            for (const a of data.articles) {
+              if (!a || !a.url || !a.title || seen.has(a.url)) continue;
+              seen.add(a.url);
+              const sym = explicitSymbol || matchSymbolFromTitle(a.title, heldSymbols);
+              if (!sym) continue;
+              fetched.push({
+                symbol: sym,
+                source: a.domain || 'News',
+                datetime: parseGdeltDate(a.seendate),
+                headline: a.title,
+                url: a.url,
+                _live: true,
+                _sourceType: 'gdelt'
+              });
+            }
+            if (fetched.length > 0) {
+              if (explicitSymbol) {
+                const others = newsItems.filter(n => n._live && n.symbol !== explicitSymbol);
+                newsItems = [...fetched, ...others];
+              } else {
+                newsItems = fetched;
+              }
+              lastNewsFetchMs = Date.now();
+              const updEl = document.getElementById('news-updated-at');
+              if (updEl) updEl.textContent = `更新於 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
+            }
+          }
+        }
+      } catch (e) {}
+
+      isFetchingNews = false;
+      if (icon) icon.classList.remove('animate-spin');
+      renderNewsFilters();
+      renderNewsGrid();
+    }
+
+    function syncNewsWithHoldings(addedSymbol = null) {
+      const heldSet = new Set(getHeldSymbols());
+      if (newsFilterSymbol !== 'ALL' && !heldSet.has(newsFilterSymbol)) {
+        newsFilterSymbol = 'ALL';
+      }
+      renderNewsFilters();
+      renderNewsGrid();
+      if (addedSymbol && heldSet.has(addedSymbol)) {
+        if (apiKey && activeProvider === 'finnhub') fetchHoldingsNews([addedSymbol]);
+        else fetchGdeltLiveNews(addedSymbol);
+      }
+    }
+
+    function formatRelativeTime(unixSec) {
+      if (!unixSec) return '';
+      const diff = Math.max(0, Math.floor(Date.now() / 1000) - unixSec);
+      if (diff < 60) return '剛剛';
+      if (diff < 3600) return `${Math.floor(diff / 60)} 分鐘前`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)} 小時前`;
+      const d = new Date(unixSec * 1000);
+      return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderNewsFilters() {
+      const bar = document.getElementById('news-filter-bar');
+      if (!bar) return;
+      const held = getHeldSymbols();
+      if (newsFilterSymbol !== 'ALL' && !held.includes(newsFilterSymbol)) {
+        newsFilterSymbol = 'ALL';
+      }
+
+      const pills = [{ symbol: 'ALL', label: `全部持股 (${held.length})` }, ...held.map(sym => ({ symbol: sym, label: sym }))];
+      bar.innerHTML = '';
+      pills.forEach(p => {
+        const active = newsFilterSymbol === p.symbol;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = p.label;
+        btn.className = active
+          ? 'px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 text-white shrink-0 transition'
+          : 'px-3 py-1 rounded-full text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 shrink-0 transition';
+        btn.addEventListener('click', () => {
+          newsFilterSymbol = p.symbol;
+          renderNewsFilters();
+          renderNewsGrid();
+          if (p.symbol !== 'ALL') {
+            const hasSym = newsItems.some(n => n.symbol === p.symbol && n._live);
+            if (!hasSym) {
+              if (apiKey && activeProvider === 'finnhub') fetchHoldingsNews([p.symbol]);
+              else fetchGdeltLiveNews(p.symbol);
+            }
+          }
+        });
+        bar.appendChild(btn);
+      });
+    }
+
+    function renderNewsGrid(triggerTranslate = true) {
+      const grid = document.getElementById('news-grid');
+      const badge = document.getElementById('news-mode-badge');
+      if (!grid) return;
+
+      const hasLiveNews = newsItems.some(n => n._live);
+      if (apiKey) {
+        badge.textContent = 'Finnhub 即時新聞';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
+      } else if (hasLiveNews) {
+        badge.textContent = '全球即時新聞 (免金鑰)';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
+      } else {
+        badge.textContent = '範例預覽';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200';
+      }
+
+      const activeSet = new Set(getHeldSymbols());
+      const filtered = newsItems
+        .filter(n => activeSet.has(n.symbol))
+        .filter(n => newsFilterSymbol === 'ALL' || n.symbol === newsFilterSymbol)
+        .sort((a, b) => (b.datetime || 0) - (a.datetime || 0))
+        .slice(0, 12);
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="col-span-full py-8 text-center text-xs text-slate-400">目前沒有符合篩選條件的持股新聞</div>`;
+        return;
+      }
+
+      grid.innerHTML = '';
+      filtered.forEach(item => {
+        const titleText = newsLangZh ? (item.headlineZh || item.headline) : item.headline;
+        const card = document.createElement('div');
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.className = 'group cursor-pointer text-left w-full rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-sm p-3.5 transition bg-slate-50/50 hover:bg-white flex flex-col justify-between gap-2.5';
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <div class="flex items-center gap-1.5">
+                <span class="px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-bold">${escapeHtml(item.symbol)}</span>
+                <span class="text-[11px] font-medium text-slate-500 truncate max-w-[130px]">${escapeHtml(item.source || 'News')}</span>
+              </div>
+              <span class="text-[11px] text-slate-400 shrink-0">${formatRelativeTime(item.datetime)}</span>
+            </div>
+            <h3 class="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 leading-snug line-clamp-3">
+              ${escapeHtml(titleText)}
+            </h3>
+          </div>
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-medium">
+            <span class="text-blue-600 group-hover:text-blue-700 flex items-center gap-1">
+              <span>✨ 貼到 Gemini 看詳細分析</span>
+            </span>
+            <a href="${escapeHtml(item.url || '#')}" target="_blank" rel="noopener noreferrer"
+               class="news-direct-link text-slate-400 hover:text-slate-700 hover:underline shrink-0">
+              原文 ↗
+            </a>
+          </div>
+        `;
+        const directLink = card.querySelector('.news-direct-link');
+        if (directLink) {
+          directLink.addEventListener('click', (e) => e.stopPropagation());
+        }
+        card.addEventListener('click', () => askGeminiAboutNews(item));
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            askGeminiAboutNews(item);
+          }
+        });
+        grid.appendChild(card);
+      });
+
+      if (triggerTranslate && newsLangZh) {
+        const needTranslate = filtered.filter(i => i._live && (!i.headlineZh || (i.summary && !i.summaryZh)));
+        if (needTranslate.length > 0) translateVisibleLiveNews(needTranslate);
+      }
+    }
+
+    async function fetchHoldingsNews(explicitSymbols = null) {
+      if (!apiKey || isFetchingNews) return;
+      isFetchingNews = true;
+      const icon = document.getElementById('news-refresh-icon');
+      if (icon) icon.classList.add('animate-spin');
+
+      const toDate = new Date();
+      const fromDate = new Date(Date.now() - 7 * 86400 * 1000);
+      const fmt = (d) => d.toISOString().slice(0, 10);
+      const toStr = fmt(toDate);
+      const fromStr = fmt(fromDate);
+
+      let targetSymbols = explicitSymbols;
+      if (!targetSymbols) {
+        targetSymbols = [...stocks]
+          .filter(s => (Number(s.shares) || 0) > 0)
+          .sort((a, b) => getMarketValue(b) - getMarketValue(a))
+          .slice(0, 6)
+          .map(s => s.symbol);
+        if (newsFilterSymbol !== 'ALL' && !targetSymbols.includes(newsFilterSymbol)) {
+          targetSymbols.push(newsFilterSymbol);
+        }
+      }
+
+      const fetched = [];
+      for (let i = 0; i < targetSymbols.length; i++) {
+        const sym = targetSymbols[i];
+        try {
+          const url = `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${fromStr}&to=${toStr}&token=${encodeURIComponent(apiKey)}`;
+          const res = await fetch(url);
+          if (res.status === 429 || res.status === 401 || res.status === 403) break;
+          if (res.ok) {
+            const arr = await res.json();
+            if (Array.isArray(arr)) {
+              arr.slice(0, 4).forEach(n => {
+                if (n && n.headline && n.url) {
+                  fetched.push({
+                    symbol: sym,
+                    source: n.source || 'Finnhub',
+                    datetime: n.datetime || 0,
+                    headline: n.headline,
+                    summary: n.summary || '',
+                    url: n.url,
+                    _live: true
+                  });
+                }
+              });
+            }
+          }
+        } catch (err) {}
+        if (i < targetSymbols.length - 1) {
+          await new Promise(r => setTimeout(r, 80));
+        }
+      }
+
+      if (fetched.length > 0) {
+        const fetchedSyms = new Set(targetSymbols);
+        const kept = newsItems.filter(n => n._live && !fetchedSyms.has(n.symbol));
+        const seenUrls = new Set();
+        const merged = [];
+        [...fetched, ...kept].forEach(item => {
+          const key = `${item.symbol}::${item.url}`;
+          if (!seenUrls.has(key)) {
+            seenUrls.add(key);
+            merged.push(item);
+          }
+        });
+        newsItems = merged;
+        lastNewsFetchMs = Date.now();
+        const updEl = document.getElementById('news-updated-at');
+        if (updEl) updEl.textContent = `更新於 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
+      }
+
+      isFetchingNews = false;
+      if (icon) icon.classList.remove('animate-spin');
+      renderNewsFilters();
+      renderNewsGrid();
+    }
+
+    // Toast & Send News Outline to Gemini
+    let toastTimer = null;
+    function showToast(msg) {
+      const banner = document.getElementById('toast-banner');
+      const textEl = document.getElementById('toast-text');
+      if (!banner || !textEl) return;
+      textEl.textContent = msg;
+      banner.classList.remove('hidden');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => banner.classList.add('hidden'), 4500);
+    }
+
+    async function copyTextSafe(text) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) {}
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function askGeminiAboutNews(item) {
+      const titleText = newsLangZh ? (item.headlineZh || item.headline) : item.headline;
+      const prompt = [
+        `請幫我針對這則【${item.symbol}】持股相關新聞進行詳細整理與投資影響分析（使用繁體中文）：`,
+        '',
+        `新聞大綱：${titleText}`,
+        `新聞來源：${item.source || '財經新聞'}`,
+        item.url ? `原始連結：${item.url}` : '',
+        '',
+        '請提供：',
+        '1. 事件完整脈絡與核心重點',
+        '2. 對該標的股價與基本面的潛在影響（多空雙向觀點）',
+        '3. 後續建議追蹤的關鍵指標'
+      ].filter(Boolean).join('\n');
+
+      const copied = await copyTextSafe(prompt);
+      if (copied) {
+        showToast('已自動複製新聞大綱！開啟 Gemini 後直接貼上 (Ctrl+V) 即可看詳細分析');
+      } else {
+        showToast('正在開啟 Gemini...');
+      }
+      window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer');
+    }
+
+    document.getElementById('btn-news-lang').addEventListener('click', (e) => {
+      newsLangZh = !newsLangZh;
+      e.currentTarget.textContent = newsLangZh ? '顯示：繁體中文' : '顯示：英文原文';
+      renderNewsGrid();
+    });
+
+    document.getElementById('btn-refresh-news').addEventListener('click', () => {
+      if (apiKey) {
+        fetchHoldingsNews(newsFilterSymbol !== 'ALL' ? [newsFilterSymbol] : null);
+      } else {
+        fetchGdeltLiveNews(newsFilterSymbol !== 'ALL' ? newsFilterSymbol : null);
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateStatusUI();
+      renderTreemap();
+      renderNewsFilters();
+      renderNewsGrid();
+      fetchBtcLive();
+      if (hasActiveQuotesAuth()) {
+        startPolling();
+        fetchAllQuotes();
+        if (activeProvider === 'finnhub') fetchHoldingsNews();
+        else fetchGdeltLiveNews();
+      } else {
+        fetchGdeltLiveNews();
+      }
+    });
+  </script>
+</body>
+</html>
