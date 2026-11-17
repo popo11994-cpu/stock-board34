@@ -46,80 +46,118 @@
 
   <!-- Top Control Bar -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
-      <!-- Brand & Status -->
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm tracking-tight">TM</div>
-          <div>
-            <h1 class="text-sm sm:text-base font-bold text-slate-900 leading-tight">持股即時熱力圖</h1>
-            <div class="flex items-center gap-2 text-xs text-slate-500">
-              <span id="status-badge" class="inline-flex items-center gap-1.5 font-medium">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 space-y-2">
+      <!-- Row 1: Brand + Primary Quick Actions -->
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm tracking-tight shrink-0">TM</div>
+          <div class="min-w-0">
+            <h1 class="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate">持股即時熱力圖</h1>
+            <div class="flex items-center gap-1.5 text-[11px] text-slate-500 truncate">
+              <span id="status-badge" class="inline-flex items-center gap-1 font-medium shrink-0">
                 <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
                 <span id="status-text">範例快照</span>
               </span>
-              <span class="text-slate-300">|</span>
-              <span id="last-updated">尚未連線即時報價</span>
+              <span class="text-slate-300 hidden sm:inline">|</span>
+              <span id="last-updated" class="truncate hidden sm:inline">尚未連線即時報價</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- Manual Refresh -->
+          <button id="btn-refresh" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1">
+            <svg id="refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span id="countdown-label">更新</span>
+          </button>
+
+          <!-- Hide Amounts Toggle -->
+          <button id="btn-hide-amounts" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition">
+            隱藏金額
+          </button>
+
+          <!-- Settings Menu Toggle -->
+          <div class="relative">
+            <button id="btn-more-menu" type="button" aria-label="更多設定"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>設定</span>
+            </button>
+
+            <!-- Collapsible Settings Popover -->
+            <div id="settings-popover" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-3.5 z-40 space-y-3">
+              <div>
+                <div class="text-[11px] font-semibold text-slate-400 mb-1.5">即時報價連線</div>
+                <button id="btn-api-modal" type="button"
+                  class="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition flex items-center justify-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  <span id="api-btn-label">設定即時 API</span>
+                </button>
+              </div>
+
+              <div class="pt-2 border-t border-slate-100">
+                <button id="btn-manage" type="button"
+                  class="w-full px-3 py-2 rounded-xl text-xs font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 transition flex items-center justify-center gap-1">
+                  <span>+ 增減持股 / 股數</span>
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <span class="text-xs font-medium text-slate-600">更新頻率</span>
+                <select id="select-interval" aria-label="更新頻率"
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900">
+                  <option value="30">每 30 秒</option>
+                  <option value="60" selected>每 60 秒</option>
+                  <option value="120">每 2 分鐘</option>
+                  <option value="0">手動更新</option>
+                </select>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <span class="text-xs font-medium text-slate-600">漲跌配色</span>
+                <button id="btn-color-mode" type="button"
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition">
+                  美股配色 (紅跌綠漲)
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <span class="text-xs font-medium text-slate-600">預覽模式</span>
+                <button id="btn-demo-live" type="button"
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5">
+                  <span id="demo-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  <span>模擬跳動</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Controls -->
-      <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-        <!-- Market Filter (All / US / TW) -->
-        <div id="market-filter-group" class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs font-semibold">
+      <!-- Row 2: Market Filter + Allocation Lookup + Manage Holdings -->
+      <div class="flex items-center justify-between gap-2">
+        <div id="market-filter-group" class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs font-semibold shrink-0">
           <button type="button" data-mf="ALL" class="mf-btn px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-2xs transition">全部</button>
           <button type="button" data-mf="USD" class="mf-btn px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">只看美股</button>
           <button type="button" data-mf="TWD" class="mf-btn px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">只看台股</button>
         </div>
-        <!-- Demo Live Toggle -->
-        <button id="btn-demo-live" type="button"
-          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5"
-          title="沒有 API Key 時可先開啟模擬跳動預覽效果">
-          <span id="demo-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-          <span>模擬跳動</span>
-        </button>
 
-        <!-- Refresh Interval -->
-        <select id="select-interval" aria-label="更新頻率"
-          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900">
-          <option value="30">每 30 秒</option>
-          <option value="60" selected>每 60 秒</option>
-          <option value="120">每 2 分鐘</option>
-          <option value="0">手動更新</option>
-        </select>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button id="btn-allocation" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition">
+            佔比查詢
+          </button>
 
-        <!-- Manual Refresh -->
-        <button id="btn-refresh" type="button"
-          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1">
-          <svg id="refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span id="countdown-label">更新</span>
-        </button>
-
-        <!-- Color Convention Toggle -->
-        <button id="btn-color-mode" type="button"
-          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition"
-          title="切換美股(紅跌綠漲)與台股(紅漲綠跌)配色">
-          美股配色 (紅跌綠漲)
-        </button>
-
-        <!-- Portfolio Manager -->
-        <button id="btn-manage" type="button"
-          class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 transition flex items-center gap-1">
-          <span>+ 增減持股 / 股數</span>
-        </button>
-
-        <!-- API Key Settings -->
-        <button id="btn-api-modal" type="button"
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-          <span id="api-btn-label">設定即時 API</span>
-        </button>
+        </div>
       </div>
     </div>
   </header>
@@ -165,10 +203,13 @@
       </div>
 
       <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
-        <span class="text-xs sm:text-sm font-medium text-slate-500">加權漲跌</span>
-        <div class="mt-1 flex items-baseline justify-between gap-2">
-          <strong id="stat-avg" class="text-base sm:text-lg font-bold">-3.24%</strong>
-          <span class="text-xs sm:text-sm text-slate-500">漲/跌 <strong id="stat-updown" class="text-slate-900">0 / 21</strong></span>
+        <div class="flex items-center justify-between gap-1.5">
+          <span class="text-xs sm:text-sm font-medium text-slate-500 shrink-0">加權漲跌</span>
+          <span class="text-[11px] text-slate-500 whitespace-nowrap bg-slate-100 px-1.5 py-0.5 rounded font-medium"><strong id="stat-updown" class="text-slate-800">0漲 21跌</strong></span>
+        </div>
+        <div class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <strong id="stat-avg" class="text-base sm:text-lg font-extrabold">-3.24%</strong>
+          <span id="stat-day-pnl" class="text-xs sm:text-sm font-semibold whitespace-nowrap">NT$0</span>
         </div>
       </div>
     </div>
@@ -180,10 +221,6 @@
           <span>持股檔數：</span>
           <strong id="stat-count" class="text-slate-900 font-bold">21</strong>
           <span>檔</span>
-        </span>
-        <span id="btc-live-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 font-medium">
-          <span>₿ BTC 24H：</span>
-          <strong id="btc-live-val" class="font-bold">讀取中...</strong>
         </span>
         <span id="fx-live-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 font-medium">
           <span>USD/TWD：</span>
@@ -197,7 +234,7 @@
   <!-- Main Treemap Container -->
   <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 flex-1 flex flex-col">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-3 flex-1 flex flex-col">
-      <div id="treemap-stage" class="relative w-full flex-1 min-h-[540px] sm:min-h-[620px]"></div>
+      <div id="treemap-stage" class="relative w-full flex-1 min-h-[640px] sm:min-h-[620px]"></div>
     </div>
 
     <!-- Holdings Related News Section -->
@@ -277,7 +314,11 @@
           <div class="text-slate-400 mb-0.5">當日最高 / 最低</div>
           <div id="dm-hl" class="font-semibold text-slate-700">--</div>
         </div>
-        <div class="col-span-2 flex justify-between border-t border-slate-200 pt-2">
+        <div class="flex justify-between col-span-2 border-t border-slate-200 pt-2">
+          <span class="text-slate-400">佔總持股比例</span>
+          <span id="dm-alloc" class="font-bold text-slate-900">--</span>
+        </div>
+        <div class="col-span-2 flex justify-between">
           <span class="text-slate-400">昨日收盤</span>
           <span id="dm-pc" class="font-semibold text-slate-700">--</span>
         </div>
@@ -407,6 +448,28 @@
     </div>
   </div>
 
+  <!-- Allocation Lookup Modal -->
+  <div id="allocation-modal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">持股佔比查詢</h2>
+          <p class="text-xs text-slate-500">依目前篩選市場計算各標的佔投資組合比例</p>
+        </div>
+        <button id="am-alloc-close" type="button" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+      </div>
+      <div class="px-5 py-3 border-b border-slate-100 bg-slate-50">
+        <input id="alloc-search-input" type="search" placeholder="搜尋股票代號或名稱（如 QQQ、NVDA、0050）..."
+          class="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900" />
+      </div>
+      <div id="alloc-list" class="overflow-y-auto px-5 py-3 flex-1 divide-y divide-slate-100"></div>
+      <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex items-center justify-between text-xs text-slate-500">
+        <span id="alloc-summary-text">共 0 檔持股</span>
+        <button id="am-alloc-done" type="button" class="px-4 py-1.5 bg-slate-900 text-white font-semibold rounded-lg">關閉</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast-banner" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2 max-w-[90vw]">
     <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
@@ -424,7 +487,7 @@
       <!-- Provider Tabs -->
       <div class="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-3 text-[11px] sm:text-xs font-semibold">
         <button id="am-tab-alpaca" type="button" class="py-1.5 rounded-lg bg-white text-slate-900 shadow-xs transition">
-          美股 Alpaca
+          美股 Alpaca (推薦)
         </button>
         <button id="am-tab-finnhub" type="button" class="py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">
           美股 Finnhub
@@ -601,7 +664,9 @@
     let alpacaSecret = safeGetStorage(STORAGE_KEY_ALPACA_SEC) || '';
     const STORAGE_KEY_FUGLE = 'tm_fugle_key_v1';
     let fugleKey = safeGetStorage(STORAGE_KEY_FUGLE) || '';
-    let activeProvider = safeGetStorage(STORAGE_KEY_PROVIDER) || (alpacaKeyId && alpacaSecret ? 'alpaca' : (apiKey ? 'finnhub' : 'alpaca'));
+    let activeProvider = (alpacaKeyId && alpacaSecret)
+      ? 'alpaca'
+      : (safeGetStorage(STORAGE_KEY_PROVIDER) || (apiKey ? 'finnhub' : 'alpaca'));
     let modalProvider = activeProvider;
 
     function hasActiveQuotesAuth() {
@@ -614,6 +679,8 @@
     let displayCurrency = safeGetStorage(STORAGE_KEY_DISPLAY_CURR) || 'TWD';
     const STORAGE_KEY_MARKET_FILTER = 'tm_market_filter_v1';
     let marketFilter = safeGetStorage(STORAGE_KEY_MARKET_FILTER) || 'ALL';
+    const STORAGE_KEY_HIDE_AMOUNTS = 'tm_hide_amounts_v1';
+    let hideAmounts = safeGetStorage(STORAGE_KEY_HIDE_AMOUNTS) === '1';
 
     function getVisibleStocks() {
       if (marketFilter === 'USD') return stocks.filter(s => getCurrency(s) === 'USD');
@@ -651,6 +718,34 @@
       return getMarketValueUSD(item);
     }
 
+    function getDayPnLUSD(item) {
+      const shares = Number(item.shares) || 0;
+      const price = Number(item.price) || 0;
+      const pct = Number(item.pct) || 0;
+      if (shares <= 0 || price <= 0) return 0;
+
+      let perShareChg = 0;
+      if (typeof item.change === 'number' && !isNaN(item.change)) {
+        perShareChg = item.change;
+      } else {
+        const denom = 1 + pct / 100;
+        const prev = denom > 0 ? (price / denom) : price;
+        perShareChg = price - prev;
+      }
+      const rawPnL = perShareChg * shares;
+      return getCurrency(item) === 'TWD' ? (rawPnL / usdTwdRate) : rawPnL;
+    }
+
+    function formatSignedCurrency(valUSD) {
+      const sign = valUSD > 0 ? '+' : (valUSD < 0 ? '-' : '');
+      const absUSD = Math.abs(valUSD || 0);
+      if (displayCurrency === 'TWD') {
+        const twd = Math.round(absUSD * usdTwdRate);
+        return `${sign}NT$${twd.toLocaleString('zh-TW')}`;
+      }
+      return `${sign}$${Math.round(absUSD).toLocaleString('en-US')}`;
+    }
+
     function formatCurrency(valUSD) {
       if (displayCurrency === 'TWD') {
         const twd = Number(valUSD || 0) * usdTwdRate;
@@ -673,17 +768,20 @@
     // Squarified Treemap Algorithm
     function computeTreemap(items, x, y, width, height) {
       const valid = items
-        .map(d => ({ ...d, mv: getMarketValue(d) }))
+        .map(d => {
+          const mv = getMarketValue(d);
+          return { ...d, mv, visualWeight: mv > 0 ? Math.pow(mv, 0.72) : 0 };
+        })
         .filter(d => d.mv > 0)
         .sort((a, b) => b.mv - a.mv);
 
-      const totalMV = valid.reduce((sum, d) => sum + d.mv, 0);
-      if (totalMV <= 0 || width <= 0 || height <= 0) return [];
+      const totalVisual = valid.reduce((sum, d) => sum + d.visualWeight, 0);
+      if (totalVisual <= 0 || width <= 0 || height <= 0) return [];
 
       const totalArea = width * height;
       const nodes = valid.map(d => ({
         ...d,
-        area: (d.mv / totalMV) * totalArea
+        area: (d.visualWeight / totalVisual) * totalArea
       }));
 
       const rects = [];
@@ -805,9 +903,15 @@
       const twSubEl = document.getElementById('stat-tw-sub');
       const grandEl = document.getElementById('stat-total-value');
 
-      if (displayCurrency === 'TWD') {
+      if (hideAmounts) {
+        if (usTwdEl) usTwdEl.textContent = '••••••';
+        if (usUsdEl) usUsdEl.textContent = '';
+        if (twTwdEl) twTwdEl.textContent = '••••••';
+        if (twSubEl) twSubEl.textContent = '';
+        if (grandEl) grandEl.textContent = '••••••';
+      } else if (displayCurrency === 'TWD') {
         if (usTwdEl) usTwdEl.textContent = formatTWD(usTotalTWD);
-        if (usUsdEl) usUsdEl.textContent = `(${formatUSD(usTotalUSD)})`;
+        if (usUsdEl) usTwdEl.textContent = `(${formatUSD(usTotalUSD)})`;
         if (twTwdEl) twTwdEl.textContent = formatTWD(twTotalTWD);
         if (twSubEl) twSubEl.textContent = '';
         if (grandEl) grandEl.textContent = formatTWD(grandTotalTWD);
@@ -832,7 +936,7 @@
         else levEl.className = 'text-base sm:text-lg font-extrabold text-slate-900';
       }
       if (expEl) {
-        expEl.textContent = `(總曝險 ${formatCurrency(totalExposure)})`;
+        expEl.textContent = hideAmounts ? '(總曝險 ••••••)' : `(總曝險 ${formatCurrency(totalExposure)})`;
       }
 
       const weightedPct = visMV > 0
@@ -843,18 +947,26 @@
 
       const isUp = weightedPct >= 0;
       const green = usColorMode ? isUp : !isUp;
-      avgEl.className = `text-base sm:text-lg font-bold ${green ? 'text-emerald-600' : 'text-rose-600'}`;
+      avgEl.className = `text-base sm:text-lg font-extrabold ${green ? 'text-emerald-600' : 'text-rose-600'}`;
 
       const upCount = visibleActive.filter(d => (d.pct || 0) > 0).length;
       const downCount = visibleActive.filter(d => (d.pct || 0) < 0).length;
-      document.getElementById('stat-updown').textContent = `${upCount} / ${downCount}`;
+      document.getElementById('stat-updown').textContent = `${upCount}漲 ${downCount}跌`;
+
+      const totalDayPnLUSD = visibleActive.reduce((s, d) => s + getDayPnLUSD(d), 0);
+      const dayPnlEl = document.getElementById('stat-day-pnl');
+      if (dayPnlEl) {
+        dayPnlEl.textContent = hideAmounts ? '••••••' : formatSignedCurrency(totalDayPnLUSD);
+        const pnlGreen = usColorMode ? totalDayPnLUSD >= 0 : totalDayPnLUSD < 0;
+        dayPnlEl.className = `text-xs sm:text-sm font-semibold whitespace-nowrap ${pnlGreen ? 'text-emerald-600' : 'text-rose-600'}`;
+      }
     }
 
     function renderTreemap(changedSymbols = new Set()) {
       const rect = stageEl.getBoundingClientRect();
       const width = rect.width;
-      const height = Math.max(rect.height, 520);
-      const gap = 6;
+      const height = Math.max(rect.height, width < 500 ? 640 : 560);
+      const gap = width < 500 ? 4 : 6;
 
       const visibleStocks = getVisibleStocks();
       const layout = computeTreemap(visibleStocks, 0, 0, width, height);
@@ -892,65 +1004,48 @@
         tile.style.color = colors.text;
 
         const pctVal = Number(item.pct || 0);
-        const arrow = pctVal > 0 ? '↑' : (pctVal < 0 ? '↓' : '–');
         const pctStr = `${pctVal > 0 ? '+' : ''}${pctVal.toFixed(2)}%`;
-        const priceStr = formatNativePrice(item);
-        const mvStr = formatCurrency(getMarketValue(item));
-        const sharesStr = `${formatShares(item.shares)} 股`;
+        const pnlStr = hideAmounts ? '' : formatSignedCurrency(getDayPnLUSD(item));
 
-        if (tileH < 46 || tileW < 85) {
+        if (tileH < 22 || tileW < 42) {
+          // Ultra-tiny holdings: clean color block without clipped text (tap for details)
+          tile.innerHTML = '';
+        } else if (tileH < 46) {
+          // Short horizontal strip: side-by-side ticker + %
           tile.innerHTML = `
-            <div class="h-full w-full px-2.5 flex items-center justify-between gap-1.5 text-xs font-bold truncate">
+            <div class="h-full w-full px-1.5 flex items-center justify-between gap-1 text-[10px] font-extrabold overflow-hidden">
               <span class="truncate">${item.symbol}</span>
-              <span class="shrink-0 font-semibold" style="color:${colors.sub}">${pctStr}</span>
+              <span class="shrink-0 font-bold" style="color:${colors.sub}">${pctStr}</span>
             </div>
           `;
-        } else if (tileW < 135 || tileH < 105) {
+        } else if (tileW < 96 || tileH < 86) {
+          // Narrow or compact vertical tile: stack vertically so ticker NEVER truncates to S... or T.
+          const showPnl = tileH >= 64 && tileW >= 54;
+          const symSize = tileW < 64 ? 'text-[11px]' : 'text-xs sm:text-sm';
+          const pctSize = tileW < 64 ? 'text-[10px]' : 'text-[11px] sm:text-xs';
           tile.innerHTML = `
-            <div class="h-full w-full p-2.5 flex flex-col justify-between">
-              <div>
-                <div class="flex items-center justify-between gap-1">
-                  <span class="font-bold text-sm leading-tight truncate">${item.symbol}</span>
-                  ${priceStr ? `<span class="text-[11px] font-semibold opacity-85">${priceStr}</span>` : ''}
-                </div>
-                <div class="text-xs font-semibold mt-0.5 flex items-center gap-1" style="color:${colors.sub}">
-                  <span>${pctStr}</span>
-                  <span class="text-[10px]">${arrow}</span>
-                </div>
-              </div>
-              ${tileH >= 84 ? `
-                <div class="flex items-center justify-between gap-1">
-                  <span class="text-[10px] opacity-80 truncate">${sharesStr}</span>
-                  <span class="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold shrink-0"
-                        style="background:${colors.badgeBg}; color:${item.color || '#1e293b'}">
-                    ${item.symbol.slice(0, 2)}
-                  </span>
-                </div>
-              ` : ''}
+            <div class="h-full w-full px-1.5 py-1.5 flex flex-col justify-center gap-0.5 overflow-hidden">
+              <div class="${symSize} font-extrabold leading-tight tracking-tight truncate">${item.symbol}</div>
+              <div class="${pctSize} font-bold leading-tight truncate" style="color:${colors.sub}">${pctStr}</div>
+              ${(showPnl && pnlStr) ? `<div class="text-[10px] font-semibold leading-tight tracking-tighter truncate opacity-90" style="color:${colors.sub}">${pnlStr}</div>` : ''}
+            </div>
+          `;
+        } else if (tileW < 145 || tileH < 110) {
+          // Medium holdings
+          tile.innerHTML = `
+            <div class="h-full w-full p-2.5 flex flex-col justify-center gap-0.5 overflow-hidden">
+              <div class="font-extrabold text-sm sm:text-base leading-tight truncate">${item.symbol}</div>
+              <div class="text-xs sm:text-sm font-bold leading-tight" style="color:${colors.sub}">${pctStr}</div>
+              ${pnlStr ? `<div class="text-[11px] sm:text-xs font-semibold truncate opacity-90" style="color:${colors.sub}">${pnlStr}</div>` : ''}
             </div>
           `;
         } else {
+          // Large holdings
           tile.innerHTML = `
-            <div class="h-full w-full p-3.5 flex flex-col justify-between">
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <div class="font-bold text-base sm:text-lg leading-tight tracking-tight truncate flex items-center gap-1.5"><span>${item.symbol}</span>${getLeverage(item) !== 1 ? `<span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-black/15">${getLeverage(item)}x</span>` : ''}</div>
-                  <div class="text-[11px] sm:text-xs opacity-80 truncate mt-0.5">${item.name || item.symbol}</div>
-                  <div class="mt-1.5 flex items-center gap-1.5 text-xs sm:text-sm font-bold" style="color:${colors.sub}">
-                    <span>${pctStr}</span>
-                    <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px]"
-                          style="background:${colors.text}; color:${colors.bg}">${arrow}</span>
-                  </div>
-                </div>
-                <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-extrabold shadow-xs"
-                     style="background:${colors.badgeBg}; color:${item.color || '#1e293b'}">
-                  ${item.symbol.slice(0, 2)}
-                </div>
-              </div>
-              <div class="flex items-baseline justify-between text-xs pt-1.5 border-t border-black/10">
-                <span class="font-bold text-sm">${priceStr}</span>
-                <span class="text-[11px] font-medium opacity-85">${sharesStr} · ${mvStr}</span>
-              </div>
+            <div class="h-full w-full p-3.5 flex flex-col justify-center gap-1 overflow-hidden">
+              <div class="font-extrabold text-lg sm:text-xl leading-tight tracking-tight truncate">${item.symbol}</div>
+              <div class="text-sm sm:text-base font-bold leading-tight" style="color:${colors.sub}">${pctStr}</div>
+              ${pnlStr ? `<div class="text-xs sm:text-sm font-semibold truncate opacity-90" style="color:${colors.sub}">${pnlStr}</div>` : ''}
             </div>
           `;
         }
@@ -983,8 +1078,8 @@
       document.getElementById('tt-price').textContent = item.price != null
         ? `${formatNativePrice(item)}${item.isLivePrice ? '' : ' (範例)'}`
         : '--';
-      document.getElementById('tt-shares').textContent = `${formatShares(item.shares)} 股`;
-      document.getElementById('tt-weight').textContent = `${formatCurrency(mv)} (${weightPct}%)`;
+      document.getElementById('tt-shares').textContent = hideAmounts ? '••••' : `${formatShares(item.shares)} 股`;
+      document.getElementById('tt-weight').textContent = hideAmounts ? `•••• (${weightPct}%)` : `${formatCurrency(mv)} (${weightPct}%)`;
       document.getElementById('tt-range').textContent =
         (item.low != null && item.high != null) ? `$${item.low.toFixed(2)} - $${item.high.toFixed(2)}` : '--';
 
@@ -1028,7 +1123,10 @@
       document.getElementById('dm-price').textContent = item.price != null
         ? `${formatNativePrice(item)}${item.isLivePrice ? '' : ' (範例)'}`
         : '--';
-      document.getElementById('dm-value').textContent = formatCurrency(getMarketValue(item));
+      const dmTotalMV = stocks.filter(s => (Number(s.shares) || 0) > 0).reduce((sum, d) => sum + getMarketValue(d), 0);
+      const dmAllocPct = dmTotalMV > 0 ? ((getMarketValue(item) / dmTotalMV) * 100).toFixed(2) : '0.00';
+      document.getElementById('dm-alloc').textContent = `${dmAllocPct}%`;
+      document.getElementById('dm-value').textContent = hideAmounts ? '••••••' : formatCurrency(getMarketValue(item));
       document.getElementById('dm-change').textContent = item.change != null ? `${item.change >= 0 ? '+' : ''}${Number(item.change).toFixed(2)}` : '--';
       document.getElementById('dm-hl').textContent = (item.high != null && item.low != null) ? `$${item.high.toFixed(2)} / $${item.low.toFixed(2)}` : '--';
       document.getElementById('dm-pc').textContent = item.pc != null ? `$${item.pc.toFixed(2)}` : '--';
@@ -1188,6 +1286,7 @@
     }
 
     document.getElementById('btn-manage').addEventListener('click', () => {
+      if (settingsPopover) settingsPopover.classList.add('hidden');
       renderManageTable();
       manageModal.classList.remove('hidden');
     });
@@ -1320,6 +1419,7 @@
     tabFugle.addEventListener('click', () => setModalProvider('fugle'));
 
     document.getElementById('btn-api-modal').addEventListener('click', () => {
+      if (settingsPopover) settingsPopover.classList.add('hidden');
       apiInput.value = apiKey;
       alpacaIdInput.value = alpacaKeyId;
       alpacaSecInput.value = alpacaSecret;
@@ -1420,9 +1520,23 @@
       }, 2500);
     });
 
-    // Live USD/TWD Exchange Rate (Keyless via open.er-api.com)
+    // USD/TWD Exchange Rate (Finnhub real-time FX if key set, fallback to open.er-api.com)
     async function fetchFxRate() {
       const fxEl = document.getElementById('fx-live-val');
+      if (apiKey) {
+        try {
+          const res = await fetch(`https://finnhub.io/api/v1/forex/rates?base=USD&token=${encodeURIComponent(apiKey)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.quote && typeof data.quote.TWD === 'number' && data.quote.TWD > 0) {
+              usdTwdRate = data.quote.TWD;
+              if (fxEl) fxEl.textContent = usdTwdRate.toFixed(2);
+              renderTreemap();
+              return;
+            }
+          }
+        } catch (e) {}
+      }
       try {
         const res = await fetch('https://open.er-api.com/v6/latest/USD');
         if (res.ok) {
@@ -1526,36 +1640,6 @@
       });
     }
 
-    // 24H BTC Live Price (Keyless via CoinGecko)
-    async function fetchBtcLive() {
-      const valEl = document.getElementById('btc-live-val');
-      if (!valEl) return;
-      try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.bitcoin && typeof data.bitcoin.usd === 'number') {
-            const p = data.bitcoin.usd;
-            const chg = Number(data.bitcoin.usd_24h_change || 0);
-            const green = usColorMode ? chg >= 0 : chg < 0;
-            valEl.textContent = `$${p.toLocaleString('en-US', { maximumFractionDigits: 0 })} (${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%)`;
-            valEl.className = green ? 'text-emerald-600' : 'text-rose-600';
-
-            // If user isn't connected to Finnhub/Alpaca yet, keep FBTC synced to 24h BTC move
-            if (!hasActiveQuotesAuth()) {
-              const fbtc = stocks.find(s => s.symbol === 'FBTC');
-              if (fbtc) {
-                fbtc.pct = Number(chg.toFixed(2));
-                renderTreemap();
-              }
-            }
-            return;
-          }
-        }
-      } catch (e) {}
-      valEl.textContent = '暫無連線';
-    }
-
     // Live Quotes Fetch (Alpaca Pre/After-hours OR Finnhub Regular)
     async function fetchAllQuotes() {
       if (!hasActiveQuotesAuth() || isFetching) return;
@@ -1606,7 +1690,8 @@
             }
           }
         } catch (err) {}
-      } else {
+      }
+      if (successCount === 0 && !authError && !rateLimited && apiKey) {
         for (let i = 0; i < stocks.length; i++) {
           const item = stocks[i];
           if (getCurrency(item) === 'TWD') continue;
@@ -1661,7 +1746,10 @@
         renderTreemap(changed);
         if (!manageModal.classList.contains('hidden')) renderManageTable();
         renderNewsFilters();
-        if (activeProvider === 'finnhub' && Date.now() - lastNewsFetchMs > 90000) fetchHoldingsNews();
+        if (Date.now() - lastNewsFetchMs > 90000) {
+          if (apiKey && activeProvider === 'finnhub') fetchHoldingsNews();
+          else fetchGdeltLiveNews();
+        }
       } else if ((activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret) || (activeProvider === 'finnhub' && apiKey)) {
         errorBanner.textContent = '無法取得美股報價，請確認網路連線或 API 金鑰。';
         errorBanner.classList.remove('hidden');
@@ -1669,8 +1757,8 @@
       updateStatusUI();
       fetchFxRate();
       fetchTwseQuotes();
+      fetchFxRate();
       fetchTwseQuotes();
-      fetchBtcLive();
     }
 
     function updateStatusUI() {
@@ -1726,13 +1814,16 @@
       if (hasActiveQuotesAuth()) startPolling();
     });
 
-    document.getElementById('btn-refresh').addEventListener('click', () => {
+    document.getElementById('btn-refresh').addEventListener('click', async () => {
       if (hasActiveQuotesAuth()) {
         const intervalSec = parseInt(document.getElementById('select-interval').value, 10);
         if (intervalSec > 0) countdownSeconds = intervalSec;
         fetchAllQuotes();
       } else {
-        document.getElementById('btn-api-modal').click();
+        refreshIcon.classList.add('animate-spin');
+        await Promise.all([fetchFxRate(), fetchTwseQuotes()]);
+        refreshIcon.classList.remove('animate-spin');
+        showToast('已更新 USD/TWD 匯率與台股資料（如要更新美股請至「設定」填入 API Key）');
       }
     });
 
@@ -2019,7 +2110,7 @@
               }
               lastNewsFetchMs = Date.now();
               const updEl = document.getElementById('news-updated-at');
-              if (updEl) updEl.textContent = `更新於 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
+              if (updEl) updEl.textContent = `每2分自動更新 · ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
             }
           }
         }
@@ -2319,12 +2410,110 @@
     });
 
     document.getElementById('btn-refresh-news').addEventListener('click', () => {
-      if (apiKey) {
+      if (apiKey && activeProvider === 'finnhub') {
         fetchHoldingsNews(newsFilterSymbol !== 'ALL' ? [newsFilterSymbol] : null);
       } else {
         fetchGdeltLiveNews(newsFilterSymbol !== 'ALL' ? newsFilterSymbol : null);
       }
     });
+
+    const moreMenuBtn = document.getElementById('btn-more-menu');
+    const settingsPopover = document.getElementById('settings-popover');
+    if (moreMenuBtn && settingsPopover) {
+      moreMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsPopover.classList.toggle('hidden');
+      });
+      settingsPopover.addEventListener('click', (e) => e.stopPropagation());
+      document.addEventListener('click', () => settingsPopover.classList.add('hidden'));
+    }
+
+    const hideAmountsBtn = document.getElementById('btn-hide-amounts');
+    function updateHideAmountsUI() {
+      if (!hideAmountsBtn) return;
+      hideAmountsBtn.textContent = hideAmounts ? '顯示金額' : '隱藏金額';
+      hideAmountsBtn.className = hideAmounts
+        ? 'px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-900 bg-slate-900 text-white transition'
+        : 'px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition';
+    }
+    if (hideAmountsBtn) {
+      updateHideAmountsUI();
+      hideAmountsBtn.addEventListener('click', () => {
+        hideAmounts = !hideAmounts;
+        safeSetStorage(STORAGE_KEY_HIDE_AMOUNTS, hideAmounts ? '1' : '0');
+        updateHideAmountsUI();
+        renderTreemap();
+        if (!allocModal.classList.contains('hidden')) renderAllocationList();
+      });
+    }
+
+    // Allocation Lookup Modal
+    const allocModal = document.getElementById('allocation-modal');
+    const allocSearchInput = document.getElementById('alloc-search-input');
+
+    function renderAllocationList() {
+      const listEl = document.getElementById('alloc-list');
+      const sumTextEl = document.getElementById('alloc-summary-text');
+      if (!listEl) return;
+
+      const visible = getVisibleStocks().filter(s => (Number(s.shares) || 0) > 0);
+      const totalMV = visible.reduce((sum, d) => sum + getMarketValue(d), 0);
+      const q = (allocSearchInput ? allocSearchInput.value : '').trim().toLowerCase();
+
+      const sorted = visible
+        .map(d => {
+          const mv = getMarketValue(d);
+          const pct = totalMV > 0 ? (mv / totalMV) * 100 : 0;
+          return { item: d, mv, pct };
+        })
+        .sort((a, b) => b.pct - a.pct)
+        .filter(r => !q || r.item.symbol.toLowerCase().includes(q) || (r.item.name || '').toLowerCase().includes(q));
+
+      if (sumTextEl) {
+        sumTextEl.textContent = `顯示 ${sorted.length} / ${visible.length} 檔持股`;
+      }
+
+      if (sorted.length === 0) {
+        listEl.innerHTML = `<div class="py-8 text-center text-xs text-slate-400">找不到符合「${escapeHtml(q)}」的持股</div>`;
+        return;
+      }
+
+      listEl.innerHTML = sorted.map(({ item, mv, pct }) => {
+        const chg = Number(item.pct || 0);
+        const green = usColorMode ? chg >= 0 : chg < 0;
+        const barW = Math.min(Math.max(pct, 1), 100);
+        return `
+          <div class="py-2.5 flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-slate-900">${escapeHtml(item.symbol)}</span>
+                <span class="text-xs text-slate-500 truncate">${escapeHtml(item.name || '')}</span>
+              </div>
+              <div class="mt-1.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-slate-800 h-1.5 rounded-full" style="width:${barW.toFixed(1)}%"></div>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-sm font-extrabold text-slate-900">${pct.toFixed(2)}%</div>
+              <div class="text-[11px] font-medium ${green ? 'text-emerald-600' : 'text-rose-600'}">
+                ${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%${hideAmounts ? '' : ` · ${formatCurrency(mv)}`}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('btn-allocation').addEventListener('click', () => {
+      if (allocSearchInput) allocSearchInput.value = '';
+      renderAllocationList();
+      allocModal.classList.remove('hidden');
+      if (allocSearchInput) allocSearchInput.focus();
+    });
+    document.getElementById('am-alloc-close').addEventListener('click', () => allocModal.classList.add('hidden'));
+    document.getElementById('am-alloc-done').addEventListener('click', () => allocModal.classList.add('hidden'));
+    allocModal.addEventListener('click', (e) => { if (e.target === allocModal) allocModal.classList.add('hidden'); });
+    if (allocSearchInput) allocSearchInput.addEventListener('input', renderAllocationList);
 
     function updateMarketFilterUI() {
       document.querySelectorAll('.mf-btn').forEach(btn => {
@@ -2351,7 +2540,6 @@
       renderTreemap();
       renderNewsFilters();
       renderNewsGrid();
-      fetchBtcLive();
       if (hasActiveQuotesAuth()) {
         startPolling();
         fetchAllQuotes();
@@ -2360,6 +2548,14 @@
       } else {
         fetchGdeltLiveNews();
       }
+
+      // Auto-refresh holdings news every 2 minutes regardless of quote API provider
+      setInterval(() => {
+        if (Date.now() - lastNewsFetchMs >= 115000) {
+          if (apiKey && activeProvider === 'finnhub') fetchHoldingsNews();
+          else fetchGdeltLiveNews();
+        }
+      }, 120000);
     });
   </script>
 </body>
