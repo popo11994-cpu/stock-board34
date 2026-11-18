@@ -2195,7 +2195,7 @@
       apiModal.classList.add('hidden');
       errorBanner.classList.add('hidden');
       updateStatusUI();
-      fetchGdeltLiveNews();
+      refreshHoldingsNewsSmart();
     });
 
     // Demo Live Simulation
@@ -2683,17 +2683,16 @@
     }
 
     async function translateVisibleLiveNews(list) {
+      const targets = list.filter(item => !item.headlineZh && item.headline);
+      if (targets.length === 0) return;
       let updated = false;
-      for (const item of list) {
+      for (let i = 0; i < targets.length; i += 6) {
         if (!newsLangZh) break;
-        if (!item.headlineZh && item.headline) {
+        const batch = targets.slice(i, i + 6);
+        await Promise.all(batch.map(async (item) => {
           item.headlineZh = await translateToZhTW(item.headline);
           updated = true;
-        }
-        if (!item.summaryZh && item.summary) {
-          item.summaryZh = await translateToZhTW(item.summary);
-          updated = true;
-        }
+        }));
       }
       if (updated) renderNewsGrid(false);
     }
@@ -2777,19 +2776,13 @@
       return null;
     }
 
-    async function fetchAlpacaLiveNews(explicitSymbol = null) {
-      if (!alpacaKeyId || !alpacaSecret || isFetchingNews) return false;
+    async function pullAlpacaNewsArray(explicitSymbol = null) {
+      if (!alpacaKeyId || !alpacaSecret) return [];
       const usHeld = getHeldSymbols().filter(s => !isTaiwanSymbol(s));
-      if (usHeld.length === 0) return false;
-
-      isFetchingNews = true;
-      const icon = document.getElementById('news-refresh-icon');
-      if (icon) icon.classList.add('animate-spin');
-
-      let ok = false;
+      if (usHeld.length === 0) return [];
       try {
         const syms = explicitSymbol ? [explicitSymbol] : usHeld.slice(0, 12);
-        const url = `https://data.alpaca.markets/v1beta1/news?symbols=${encodeURIComponent(syms.join(','))}&limit=35&sort=desc`;
+        const url = `https://data.alpaca.markets/v1beta1/news?symbols=${encodeURIComponent(syms.join(','))}&limit=30&sort=desc`;
         const res = await fetch(url, {
           headers: {
             'APCA-API-KEY-ID': alpacaKeyId,
@@ -2799,97 +2792,41 @@
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data.news) && data.news.length > 0) {
+          if (data && Array.isArray(data.news)) {
             const heldSet = new Set(usHeld);
-            const fetched = [];
-            for (const n of data.news) {
-              if (!n || !n.headline || !n.url) continue;
-              const matchedSym = (n.symbols || []).find(s => heldSet.has(s)) || syms[0];
-              fetched.push({
-                symbol: matchedSym,
+            return data.news
+              .filter(n => n && n.headline && n.url)
+              .map(n => ({
+                symbol: (n.symbols || []).find(s => heldSet.has(s)) || syms[0],
                 source: n.source || 'Alpaca News',
                 datetime: n.created_at ? Math.floor(new Date(n.created_at).getTime() / 1000) : Math.floor(Date.now() / 1000),
                 headline: n.headline,
-                summary: n.summary || '',
                 url: n.url,
                 _live: true,
                 _sourceType: 'alpaca'
-              });
-            }
-            if (fetched.length > 0) {
-              if (explicitSymbol) {
-                const others = newsItems.filter(i => i._live && i.symbol !== explicitSymbol);
-                newsItems = [...fetched, ...others];
-              } else {
-                newsItems = fetched;
-              }
-              lastNewsFetchMs = Date.now();
-              const updEl = document.getElementById('news-updated-at');
-              if (updEl) updEl.textContent = `每2分自動更新 · ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
-              ok = true;
-            }
+              }));
           }
         }
       } catch (e) {}
-
-      isFetchingNews = false;
-      if (icon) icon.classList.remove('animate-spin');
-      if (ok) {
-        renderNewsFilters();
-        renderNewsGrid();
-      }
-      return ok;
+      return [];
     }
 
-    async function refreshHoldingsNewsSmart(explicitSymbol = null) {
-      if (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret && (!explicitSymbol || !isTaiwanSymbol(explicitSymbol))) {
-        const ok = await fetchAlpacaLiveNews(explicitSymbol);
-        if (ok) return;
-      }
-      if (apiKey && activeProvider === 'finnhub' && (!explicitSymbol || !isTaiwanSymbol(explicitSymbol))) {
-        await fetchHoldingsNews(explicitSymbol ? [explicitSymbol] : null);
-        return;
-      }
-      await fetchGdeltLiveNews(explicitSymbol);
-    }
-
-    async function fetchGdeltLiveNews(explicitSymbol = null) {
-      if (isFetchingNews) return;
+    async function pullGdeltNewsArray(explicitSymbol = null) {
       const heldSymbols = getHeldSymbols();
-      if (heldSymbols.length === 0) {
-        newsItems = [];
-        renderNewsFilters();
-        renderNewsGrid();
-        return;
-      }
-
-      isFetchingNews = true;
-      const icon = document.getElementById('news-refresh-icon');
-      if (icon) icon.classList.add('animate-spin');
-
+      if (heldSymbols.length === 0) return [];
       try {
         const querySyms = explicitSymbol ? [explicitSymbol] : heldSymbols.slice(0, 8);
         const flatTerms = [...new Set(querySyms.flatMap(buildSymbolTerms))].slice(0, 16);
         const combinedQuery = flatTerms.join(' OR ');
-        const hasTw = querySyms.some(s => isTaiwanSymbol(s));
-        const terms = (hasTw && querySyms.length === 1)
-          ? `(${combinedQuery})`
-          : `(${combinedQuery}) sourcelang:eng`;
-
+        const terms = `(${combinedQuery}) (sourcelang:eng OR sourcelang:zho)`;
         const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(terms)}&mode=ArtList&maxrecords=75&timespan=7d&sort=DateDesc&format=json`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data.articles) && data.articles.length > 0) {
-            const seen = new Set();
-            const seenTitles = new Set();
+          if (data && Array.isArray(data.articles)) {
             const fetched = [];
             for (const a of data.articles) {
-              if (!a || !a.url || !a.title || seen.has(a.url)) continue;
-              const normTitle = a.title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '').slice(0, 40);
-              if (normTitle && seenTitles.has(normTitle)) continue;
-              seen.add(a.url);
-              if (normTitle) seenTitles.add(normTitle);
+              if (!a || !a.url || !a.title) continue;
               const sym = explicitSymbol || matchSymbolFromTitle(a.title, heldSymbols);
               if (!sym) continue;
               fetched.push({
@@ -2902,20 +2839,66 @@
                 _sourceType: 'gdelt'
               });
             }
-            if (fetched.length > 0) {
-              if (explicitSymbol) {
-                const others = newsItems.filter(n => n._live && n.symbol !== explicitSymbol);
-                newsItems = [...fetched, ...others];
-              } else {
-                newsItems = fetched;
-              }
-              lastNewsFetchMs = Date.now();
-              const updEl = document.getElementById('news-updated-at');
-              if (updEl) updEl.textContent = `每2分自動更新 · ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
-            }
+            return fetched;
           }
         }
       } catch (e) {}
+      return [];
+    }
+
+    function mergeAndDedupeNews(items) {
+      const seenUrls = new Set();
+      const seenTitles = new Set();
+      const merged = [];
+      for (const item of items) {
+        if (!item || !item.url || !item.headline) continue;
+        if (seenUrls.has(item.url)) continue;
+        const normTitle = item.headline.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '').slice(0, 38);
+        if (normTitle && seenTitles.has(normTitle)) continue;
+        seenUrls.add(item.url);
+        if (normTitle) seenTitles.add(normTitle);
+        merged.push(item);
+      }
+      return merged.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
+    }
+
+    async function refreshHoldingsNewsSmart(explicitSymbol = null) {
+      if (isFetchingNews) return;
+      if (apiKey && activeProvider === 'finnhub' && (!explicitSymbol || !isTaiwanSymbol(explicitSymbol))) {
+        await fetchHoldingsNews(explicitSymbol ? [explicitSymbol] : null);
+        return;
+      }
+
+      const heldSymbols = getHeldSymbols();
+      if (heldSymbols.length === 0) {
+        newsItems = [];
+        renderNewsFilters();
+        renderNewsGrid();
+        return;
+      }
+
+      isFetchingNews = true;
+      const icon = document.getElementById('news-refresh-icon');
+      if (icon) icon.classList.add('animate-spin');
+
+      const useAlpaca = activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret && (!explicitSymbol || !isTaiwanSymbol(explicitSymbol));
+      const [alpacaRes, gdeltRes] = await Promise.all([
+        useAlpaca ? pullAlpacaNewsArray(explicitSymbol) : Promise.resolve([]),
+        pullGdeltNewsArray(explicitSymbol)
+      ]);
+
+      const combined = mergeAndDedupeNews([...alpacaRes, ...gdeltRes]);
+      if (combined.length > 0) {
+        if (explicitSymbol) {
+          const others = newsItems.filter(i => i._live && i.symbol !== explicitSymbol);
+          newsItems = mergeAndDedupeNews([...combined, ...others]);
+        } else {
+          newsItems = combined;
+        }
+        lastNewsFetchMs = Date.now();
+        const updEl = document.getElementById('news-updated-at');
+        if (updEl) updEl.textContent = `每2分自動更新 · ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
+      }
 
       isFetchingNews = false;
       if (icon) icon.classList.remove('animate-spin');
@@ -2991,7 +2974,11 @@
 
       const hasLiveNews = newsItems.some(n => n._live);
       const hasAlpacaNews = newsItems.some(n => n._sourceType === 'alpaca');
-      if (hasAlpacaNews) {
+      const hasGdeltNews = newsItems.some(n => n._sourceType === 'gdelt');
+      if (hasAlpacaNews && hasGdeltNews) {
+        badge.textContent = 'Alpaca + GDELT 雙來源即時';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
+      } else if (hasAlpacaNews) {
         badge.textContent = 'Alpaca 即時新聞';
         badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
       } else if (apiKey && activeProvider === 'finnhub') {
@@ -3070,7 +3057,7 @@
       }
 
       if (triggerTranslate && newsLangZh) {
-        const needTranslate = filtered.filter(i => i._live && (!i.headlineZh || (i.summary && !i.summaryZh)));
+        const needTranslate = filtered.filter(i => i._live && !i.headlineZh && i.headline);
         if (needTranslate.length > 0) translateVisibleLiveNews(needTranslate);
       }
     }
