@@ -1,0 +1,156 @@
+name: Daily Portfolio Asset Snapshot
+
+on:
+  schedule:
+    # UTC 22:30 (Tue-Sat 06:30 AM Taiwan time, after US market close)
+    - cron: '30 22 * * 2-6'
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Daily Asset History in GitHub Gist
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          ALPACA_KEY_ID: ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: |
+          node -e '
+          const GIST_FILENAME = "stock_treemap_portfolio.json";
+          const KNOWN_LEV = {
+            TQQQ: 3, UPRO: 3, SOXL: 3, TECL: 3, SPXL: 3, UDOW: 3, TNA: 3, FNGU: 3,
+            NVDL: 2, GGLL: 2, TSLL: 2, QLD: 2, SSO: 2, BITX: 2, CONL: 2, AMZU: 2, MSFU: 2, AAPU: 2, METU: 2,
+            SQQQ: -3, SPXS: -3, SOXS: -3, QID: -2, SDS: -2, SH: -1, PSQ: -1,
+            "00631L": 2, "00675L": 2, "00685L": 2, "00663L": 2, "00670L": 2, "00632R": -1
+          };
+
+          function getTaipeiDate() {
+            const parts = new Intl.DateTimeFormat("en-CA", {
+              timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit"
+            }).formatToParts(new Date());
+            const m = Object.fromEntries(parts.map(p => [p.type, p.value]));
+            return `${m.year}-${m.month}-${m.day}`;
+          }
+
+          function isTW(s) {
+            return s.currency === "TWD" || /^\d{4,6}[A-Z]?$/.test(String(s.symbol || "").replace(/\.(TW|TWO)$/i, ""));
+          }
+
+          (async () => {
+            const { GIST_TOKEN, GIST_ID, ALPACA_KEY_ID, ALPACA_SECRET_KEY } = process.env;
+            if (!GIST_TOKEN || !GIST_ID) throw new Error("Missing GIST_TOKEN or GIST_ID secret");
+
+            // 1. Pull Gist
+            const gRes = await fetch(`https://api.github.com/gists/${encodeURIComponent(GIST_ID)}`, {
+              headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${GIST_TOKEN}` }
+            });
+            if (!gRes.ok) throw new Error(`Gist fetch failed: ${gRes.status}`);
+            const gData = await gRes.json();
+            const file = gData.files && gData.files[GIST_FILENAME];
+            if (!file || !file.content) throw new Error("Portfolio file not found in Gist");
+            const payload = JSON.parse(file.content);
+            const stocks = Array.isArray(payload.stocks) ? payload.stocks : [];
+
+            // 2. Fetch USD/TWD FX rate
+            let fx = 32.5;
+            try {
+              const fxRes = await fetch("https://open.er-api.com/v6/latest/USD");
+              if (fxRes.ok) {
+                const fxData = await fxRes.json();
+                if (fxData?.rates?.TWD) fx = Number(fxData.rates.TWD);
+              }
+            } catch {}
+
+            // 3. Fetch US prices via Alpaca (if secrets provided)
+            const usStocks = stocks.filter(s => !isTW(s));
+            if (ALPACA_KEY_ID && ALPACA_SECRET_KEY && usStocks.length > 0) {
+              try {
+                const syms = usStocks.map(s => encodeURIComponent(s.symbol)).join(",");
+                const aRes = await fetch(`https://data.alpaca.markets/v2/stocks/snapshots?symbols=${syms}`, {
+                  headers: {
+                    "APCA-API-KEY-ID": ALPACA_KEY_ID,
+                    "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
+                    Accept: "application/json"
+                  }
+                });
+                if (aRes.ok) {
+                  const aData = await aRes.json();
+                  for (const s of usStocks) {
+                    const snap = aData[s.symbol];
+                    if (snap?.latestTrade?.p > 0) {
+                      const prev = snap.prevDailyBar?.c || snap.dailyBar?.o || snap.latestTrade.p;
+                      s.price = snap.latestTrade.p;
+                      s.pct = prev > 0 ? Number((((s.price - prev) / prev) * 100).toFixed(2)) : (s.pct || 0);
+                    }
+                  }
+                }
+              } catch {}
+            }
+
+            // 4. Fetch Taiwan stock/ETF closing prices via TWSE OpenAPI
+            const twStocks = stocks.filter(s => isTW(s));
+            if (twStocks.length > 0) {
+              try {
+                const tRes = await fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL");
+                if (tRes.ok) {
+                  const rows = await tRes.json();
+                  const byCode = new Map(rows.map(r => [String(r.Code || "").trim(), r]));
+                  for (const s of twStocks) {
+                    const code = s.symbol.replace(/\.(TW|TWO)$/i, "").trim();
+                    const row = byCode.get(code);
+                    if (row?.ClosingPrice) {
+                      const close = parseFloat(String(row.ClosingPrice).replace(/,/g, ""));
+                      const chg = parseFloat(String(row.Change || "0").replace(/,/g, "")) || 0;
+                      if (close > 0) {
+                        const prev = close - chg;
+                        s.price = close;
+                        s.pct = prev > 0 ? Number(((chg / prev) * 100).toFixed(2)) : (s.pct || 0);
+                      }
+                    }
+                  }
+                }
+              } catch {}
+            }
+
+            // 5. Compute daily totals
+            const active = stocks.filter(s => (Number(s.shares) || 0) > 0);
+            const usTotalUSD = active.filter(s => !isTW(s)).reduce((sum, s) => sum + (Number(s.shares) * Number(s.price || 0)), 0);
+            const usTWD = Math.round(usTotalUSD * fx);
+            const twTWD = Math.round(active.filter(s => isTW(s)).reduce((sum, s) => sum + (Number(s.shares) * Number(s.price || 0)), 0));
+            const totalTWD = usTWD + twTWD;
+
+            const totalMVUSD = usTotalUSD + (fx > 0 ? twTWD / fx : 0);
+            const totalExpUSD = active.reduce((sum, s) => {
+              const mvUSD = isTW(s) ? ((Number(s.shares) * Number(s.price || 0)) / fx) : (Number(s.shares) * Number(s.price || 0));
+              const lev = typeof s.leverage === "number" ? s.leverage : (KNOWN_LEV[s.symbol] || 1);
+              return sum + mvUSD * lev;
+            }, 0);
+            const leverage = totalMVUSD > 0 ? Number((totalExpUSD / totalMVUSD).toFixed(2)) : 1;
+
+            const today = getTaipeiDate();
+            const history = Array.isArray(payload.assetHistory) ? payload.assetHistory : [];
+            const entry = { date: today, totalTWD, usTWD, twTWD, usUSD: Math.round(usTotalUSD), fx: Number(fx.toFixed(2)), leverage };
+            const idx = history.findIndex(r => r.date === today);
+            if (idx >= 0) history[idx] = entry;
+            else history.push(entry);
+            history.sort((a, b) => a.date.localeCompare(b.date));
+
+            payload.assetHistory = history;
+            payload.updatedAt = Date.now();
+
+            // 6. Push back to Gist
+            const pRes = await fetch(`https://api.github.com/gists/${encodeURIComponent(GIST_ID)}`, {
+              method: "PATCH",
+              headers: {
+                Accept: "application/vnd.github+json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${GIST_TOKEN}`
+              },
+              body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(payload, null, 2) } } })
+            });
+            if (!pRes.ok) throw new Error(`Gist PATCH failed: ${pRes.status}`);
+            console.log("Recorded snapshot:", entry);
+          })();
+          '
