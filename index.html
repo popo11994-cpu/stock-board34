@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>即時美股熱力圖看板 | Stock Treemap</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -163,6 +164,10 @@
           <button id="btn-allocation" type="button"
             class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition">
             佔比查詢
+          </button>
+          <button id="btn-history" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition">
+            資產紀錄
           </button>
 
         </div>
@@ -550,6 +555,76 @@
             儲存並立即同步
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Asset History Modal -->
+  <div id="history-modal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">每日總資產歷史紀錄</h2>
+          <p class="text-xs text-slate-500">每次開啟或更新報價會自動記錄當日最新總市值（若已啟用雲端同步會一併備份至 Gist）</p>
+        </div>
+        <button id="hm-close" type="button" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+      </div>
+
+      <div class="p-5 overflow-y-auto flex-1 space-y-4">
+        <!-- 3-Way Mode Switcher (總資產 / 臺股 / 美股) -->
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div id="hm-mode-group" class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs font-semibold">
+            <button type="button" data-hm="TOTAL" class="hm-mode-btn px-3 py-1 rounded-md bg-white text-slate-900 shadow-2xs transition">總資產</button>
+            <button type="button" data-hm="TW" class="hm-mode-btn px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">臺股</button>
+            <button type="button" data-hm="US" class="hm-mode-btn px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">美股</button>
+          </div>
+          <button id="hm-snapshot-now" type="button"
+            class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold transition">
+            立即記錄今日快照
+          </button>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span id="hm-chart-title" class="text-xs font-semibold text-slate-700">總資產走勢（新台幣 NT$）</span>
+          </div>
+          <div class="relative h-56 sm:h-64">
+            <canvas id="history-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Search & Table -->
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <input id="hm-search" type="search" placeholder="依日期篩選（如 2026-11）..."
+              class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 w-48 sm:w-56" />
+            <button id="hm-export-csv" type="button"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition">
+              匯出 CSV
+            </button>
+          </div>
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-xs">
+              <thead id="hm-thead" class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="py-2 px-3 text-left font-semibold">日期</th>
+                  <th class="py-2 px-3 text-right font-semibold">股票總市值</th>
+                  <th class="py-2 px-3 text-right font-semibold">美股 (台幣)</th>
+                  <th class="py-2 px-3 text-right font-semibold">台股 (台幣)</th>
+                  <th class="py-2 px-3 text-right font-semibold">匯率 / 槓桿</th>
+                  <th class="py-2 px-3 text-right font-semibold">操作</th>
+                </tr>
+              </thead>
+              <tbody id="hm-tbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex items-center justify-between text-xs text-slate-500">
+        <span id="hm-count-text">共 0 筆紀錄</span>
+        <button id="hm-done" type="button" class="px-4 py-1.5 bg-slate-900 text-white font-semibold rounded-lg">關閉</button>
       </div>
     </div>
   </div>
@@ -1044,7 +1119,306 @@
         const pnlGreen = usColorMode ? totalDayPnLUSD >= 0 : totalDayPnLUSD < 0;
         dayPnlEl.className = `text-xs sm:text-sm font-semibold whitespace-nowrap ${pnlGreen ? 'text-emerald-600' : 'text-rose-600'}`;
       }
+      recordDailySnapshot(false);
     }
+
+    function getLocalDateStr() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function recordDailySnapshot(manual = false) {
+      const active = stocks.filter(s => (Number(s.shares) || 0) > 0);
+      if (active.length === 0) return;
+
+      const usTotalUSD = active.filter(d => getCurrency(d) === 'USD')
+        .reduce((s, d) => s + ((Number(d.shares) || 0) * (Number(d.price) || 0)), 0);
+      const usTWD = Math.round(usTotalUSD * usdTwdRate);
+      const twTWD = Math.round(active.filter(d => getCurrency(d) === 'TWD')
+        .reduce((s, d) => s + ((Number(d.shares) || 0) * (Number(d.price) || 0)), 0));
+      const totalTWD = usTWD + twTWD;
+
+      const totalMV = active.reduce((s, d) => s + getMarketValue(d), 0);
+      const totalExp = active.reduce((s, d) => s + getMarketValue(d) * getLeverage(d), 0);
+      const lev = totalMV > 0 ? Number((totalExp / totalMV).toFixed(2)) : 1;
+
+      const today = getLocalDateStr();
+      const entry = {
+        date: today,
+        totalTWD,
+        usTWD,
+        twTWD,
+        usUSD: Math.round(usTotalUSD),
+        fx: Number(usdTwdRate.toFixed(2)),
+        leverage: lev
+      };
+
+      const idx = assetHistory.findIndex(r => r.date === today);
+      if (idx >= 0) {
+        const prev = assetHistory[idx];
+        if (!manual && prev.totalTWD === entry.totalTWD && prev.fx === entry.fx && prev.leverage === entry.leverage) {
+          return;
+        }
+        assetHistory[idx] = entry;
+      } else {
+        assetHistory.push(entry);
+        assetHistory.sort((a, b) => a.date.localeCompare(b.date));
+      }
+
+      safeSetStorage(STORAGE_KEY_HISTORY, JSON.stringify(assetHistory));
+      if (manual) {
+        showToast(`已記錄 ${today} 總資產快照：NT$${totalTWD.toLocaleString('zh-TW')}`);
+        if (gistToken && gistId) {
+          if (gistPushTimer) clearTimeout(gistPushTimer);
+          gistPushTimer = setTimeout(() => pushToGist(false), 600);
+        }
+      }
+    }
+
+    const historyModal = document.getElementById('history-modal');
+    const hmSearchInput = document.getElementById('hm-search');
+    let historyViewMode = 'TOTAL'; // 'TOTAL' | 'TW' | 'US'
+
+    function updateHistoryModeUI() {
+      document.querySelectorAll('.hm-mode-btn').forEach(btn => {
+        const active = btn.dataset.hm === historyViewMode;
+        btn.className = active
+          ? 'hm-mode-btn px-3 py-1 rounded-md bg-white text-slate-900 shadow-2xs transition'
+          : 'hm-mode-btn px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
+      });
+    }
+
+    document.querySelectorAll('.hm-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        historyViewMode = btn.dataset.hm || 'TOTAL';
+        updateHistoryModeUI();
+        renderHistoryModal();
+      });
+    });
+
+    function renderHistoryModal() {
+      const thead = document.getElementById('hm-thead');
+      const tbody = document.getElementById('hm-tbody');
+      const countEl = document.getElementById('hm-count-text');
+      const chartTitleEl = document.getElementById('hm-chart-title');
+      const q = (hmSearchInput ? hmSearchInput.value : '').trim();
+
+      const modeMeta = {
+        TOTAL: { title: '總資產走勢（新台幣 NT$）', color: '#0f172a', bg: 'rgba(15, 23, 42, 0.08)', field: 'totalTWD' },
+        TW:    { title: '臺股總市值走勢（新台幣 NT$）', color: '#0f766e', bg: 'rgba(15, 118, 110, 0.10)', field: 'twTWD' },
+        US:    { title: '美股總市值走勢（折合新台幣 NT$）', color: '#1d4ed8', bg: 'rgba(29, 78, 216, 0.10)', field: 'usTWD' }
+      }[historyViewMode];
+
+      if (chartTitleEl) chartTitleEl.textContent = modeMeta.title;
+
+      const rows = [...assetHistory]
+        .filter(r => !q || r.date.includes(q))
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      if (countEl) countEl.textContent = `共 ${rows.length} 筆每日紀錄`;
+
+      if (thead) {
+        if (historyViewMode === 'TOTAL') {
+          thead.innerHTML = `
+            <tr>
+              <th class="py-2 px-3 text-left font-semibold">日期</th>
+              <th class="py-2 px-3 text-right font-semibold">總資產 (NT$)</th>
+              <th class="py-2 px-3 text-right font-semibold">匯率</th>
+              <th class="py-2 px-3 text-right font-semibold">總槓桿</th>
+              <th class="py-2 px-3 text-right font-semibold">操作</th>
+            </tr>`;
+        } else if (historyViewMode === 'TW') {
+          thead.innerHTML = `
+            <tr>
+              <th class="py-2 px-3 text-left font-semibold">日期</th>
+              <th class="py-2 px-3 text-right font-semibold">臺股總市值 (NT$)</th>
+              <th class="py-2 px-3 text-right font-semibold">佔總資產比例</th>
+              <th class="py-2 px-3 text-right font-semibold">操作</th>
+            </tr>`;
+        } else {
+          thead.innerHTML = `
+            <tr>
+              <th class="py-2 px-3 text-left font-semibold">日期</th>
+              <th class="py-2 px-3 text-right font-semibold">美股台幣市值</th>
+              <th class="py-2 px-3 text-right font-semibold">美金原值</th>
+              <th class="py-2 px-3 text-right font-semibold">匯率</th>
+              <th class="py-2 px-3 text-right font-semibold">操作</th>
+            </tr>`;
+        }
+      }
+
+      if (tbody) {
+        if (rows.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">尚無符合條件的歷史紀錄</td></tr>`;
+        } else {
+          tbody.innerHTML = rows.map(r => {
+            if (historyViewMode === 'TOTAL') {
+              return `
+                <tr class="hover:bg-slate-50">
+                  <td class="py-2 px-3 font-semibold text-slate-900 whitespace-nowrap">${escapeHtml(r.date)}</td>
+                  <td class="py-2 px-3 text-right font-bold text-slate-900 whitespace-nowrap">NT$${Number(r.totalTWD || 0).toLocaleString('zh-TW')}</td>
+                  <td class="py-2 px-3 text-right text-slate-500 whitespace-nowrap">${Number(r.fx || 32.5).toFixed(2)}</td>
+                  <td class="py-2 px-3 text-right text-slate-600 whitespace-nowrap">${Number(r.leverage || 1).toFixed(2)}x</td>
+                  <td class="py-2 px-3 text-right"><button type="button" data-del-date="${escapeHtml(r.date)}" class="hm-del text-slate-400 hover:text-rose-600 font-medium">刪除</button></td>
+                </tr>`;
+            } else if (historyViewMode === 'TW') {
+              const twRatio = r.totalTWD > 0 ? ((r.twTWD / r.totalTWD) * 100).toFixed(1) : '0.0';
+              return `
+                <tr class="hover:bg-slate-50">
+                  <td class="py-2 px-3 font-semibold text-slate-900 whitespace-nowrap">${escapeHtml(r.date)}</td>
+                  <td class="py-2 px-3 text-right font-bold text-teal-700 whitespace-nowrap">NT$${Number(r.twTWD || 0).toLocaleString('zh-TW')}</td>
+                  <td class="py-2 px-3 text-right text-slate-600 whitespace-nowrap">${twRatio}%</td>
+                  <td class="py-2 px-3 text-right"><button type="button" data-del-date="${escapeHtml(r.date)}" class="hm-del text-slate-400 hover:text-rose-600 font-medium">刪除</button></td>
+                </tr>`;
+            } else {
+              return `
+                <tr class="hover:bg-slate-50">
+                  <td class="py-2 px-3 font-semibold text-slate-900 whitespace-nowrap">${escapeHtml(r.date)}</td>
+                  <td class="py-2 px-3 text-right font-bold text-blue-700 whitespace-nowrap">NT$${Number(r.usTWD || 0).toLocaleString('zh-TW')}</td>
+                  <td class="py-2 px-3 text-right text-slate-600 whitespace-nowrap">$${Number(r.usUSD || 0).toLocaleString('en-US')}</td>
+                  <td class="py-2 px-3 text-right text-slate-500 whitespace-nowrap">${Number(r.fx || 32.5).toFixed(2)}</td>
+                  <td class="py-2 px-3 text-right"><button type="button" data-del-date="${escapeHtml(r.date)}" class="hm-del text-slate-400 hover:text-rose-600 font-medium">刪除</button></td>
+                </tr>`;
+            }
+          }).join('');
+
+          tbody.querySelectorAll('.hm-del').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              const dt = e.currentTarget.dataset.delDate;
+              assetHistory = assetHistory.filter(r => r.date !== dt);
+              safeSetStorage(STORAGE_KEY_HISTORY, JSON.stringify(assetHistory));
+              renderHistoryModal();
+            });
+          });
+        }
+      }
+
+      // Render Chart.js line chart for selected mode
+      const canvas = document.getElementById('history-chart');
+      if (canvas && typeof Chart !== 'undefined') {
+        const asc = [...assetHistory].sort((a, b) => a.date.localeCompare(b.date));
+        const labels = asc.map(r => r.date.slice(5));
+        const ptR = asc.length <= 15 ? 4 : 2;
+
+        const datasets = historyViewMode === 'TOTAL'
+          ? [
+              {
+                label: '總資產 (NT$)',
+                data: asc.map(r => Number(r.totalTWD || 0)),
+                borderColor: '#0f172a',
+                backgroundColor: 'rgba(15, 23, 42, 0.06)',
+                borderWidth: 2.5,
+                pointRadius: ptR,
+                fill: false,
+                tension: 0.25
+              },
+              {
+                label: '美股 (NT$)',
+                data: asc.map(r => Number(r.usTWD || 0)),
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                borderWidth: 2,
+                pointRadius: ptR,
+                fill: false,
+                tension: 0.25
+              },
+              {
+                label: '臺股 (NT$)',
+                data: asc.map(r => Number(r.twTWD || 0)),
+                borderColor: '#0d9488',
+                backgroundColor: 'rgba(13, 148, 136, 0.08)',
+                borderWidth: 2,
+                pointRadius: ptR,
+                fill: false,
+                tension: 0.25
+              }
+            ]
+          : [
+              {
+                label: modeMeta.title,
+                data: asc.map(r => Number(r[modeMeta.field] || 0)),
+                borderColor: modeMeta.color,
+                backgroundColor: modeMeta.bg,
+                borderWidth: 2.5,
+                pointRadius: ptR,
+                fill: true,
+                tension: 0.25
+              }
+            ];
+
+        if (historyChartInstance) historyChartInstance.destroy();
+        historyChartInstance = new Chart(canvas.getContext('2d'), {
+          type: 'line',
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                display: historyViewMode === 'TOTAL',
+                position: 'top',
+                labels: { boxWidth: 12, usePointStyle: true, font: { size: 11 } }
+              },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const val = `NT$${Number(ctx.parsed.y || 0).toLocaleString('zh-TW')}`;
+                    if (historyViewMode === 'US' && asc[ctx.dataIndex]) {
+                      return `${ctx.dataset.label}: ${val} ($${Number(asc[ctx.dataIndex].usUSD || 0).toLocaleString('en-US')})`;
+                    }
+                    return `${ctx.dataset.label}: ${val}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (v) => 'NT$' + Number(v).toLocaleString('zh-TW')
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    document.getElementById('btn-history').addEventListener('click', () => {
+      recordDailySnapshot(false);
+      if (hmSearchInput) hmSearchInput.value = '';
+      renderHistoryModal();
+      historyModal.classList.remove('hidden');
+    });
+    document.getElementById('hm-close').addEventListener('click', () => historyModal.classList.add('hidden'));
+    document.getElementById('hm-done').addEventListener('click', () => historyModal.classList.add('hidden'));
+    historyModal.addEventListener('click', (e) => { if (e.target === historyModal) historyModal.classList.add('hidden'); });
+    if (hmSearchInput) hmSearchInput.addEventListener('input', renderHistoryModal);
+
+    document.getElementById('hm-snapshot-now').addEventListener('click', () => {
+      recordDailySnapshot(true);
+      renderHistoryModal();
+    });
+
+    document.getElementById('hm-export-csv').addEventListener('click', () => {
+      const header = 'Date,Total_TWD,US_TWD,TW_TWD,US_USD,USD_TWD_FX,Leverage';
+      const lines = [...assetHistory]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(r => `${r.date},${r.totalTWD},${r.usTWD},${r.twTWD},${r.usUSD || 0},${r.fx || 32.5},${r.leverage || 1}`);
+      const csv = [header, ...lines].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'portfolio_daily_history.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
 
     function renderTreemap(changedSymbols = new Set()) {
       const rect = stageEl.getBoundingClientRect();
@@ -1461,6 +1835,19 @@
     const STORAGE_KEY_PORTFOLIO_TS = 'tm_portfolio_ts_v1';
     const GIST_FILENAME = 'stock_treemap_portfolio.json';
 
+    const STORAGE_KEY_HISTORY = 'tm_asset_history_v1';
+    let assetHistory = (() => {
+      const raw = safeGetStorage(STORAGE_KEY_HISTORY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {}
+      }
+      return [];
+    })();
+    let historyChartInstance = null;
+
     let gistToken = safeGetStorage(STORAGE_KEY_GIST_TOKEN) || '';
     let gistId = safeGetStorage(STORAGE_KEY_GIST_ID) || '';
     let localPortfolioTs = parseInt(safeGetStorage(STORAGE_KEY_PORTFOLIO_TS) || '0', 10) || 0;
@@ -1486,8 +1873,9 @@
 
     function buildSyncPayload() {
       return {
-        version: 1,
+        version: 2,
         updatedAt: localPortfolioTs || Date.now(),
+        assetHistory: assetHistory,
         stocks: stocks.map(s => ({
           symbol: s.symbol,
           name: s.name,
@@ -1572,6 +1960,14 @@
               const remoteTs = Number(parsed.updatedAt) || 0;
               if (forceOverwrite || remoteTs > localPortfolioTs) {
                 stocks = parsed.stocks;
+                if (Array.isArray(parsed.assetHistory)) {
+                  const byDate = new Map();
+                  [...assetHistory, ...parsed.assetHistory].forEach(r => {
+                    if (r && r.date) byDate.set(r.date, r);
+                  });
+                  assetHistory = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+                  safeSetStorage(STORAGE_KEY_HISTORY, JSON.stringify(assetHistory));
+                }
                 localPortfolioTs = remoteTs || Date.now();
                 safeSetStorage(STORAGE_KEY_STOCKS, JSON.stringify(stocks));
                 safeSetStorage(STORAGE_KEY_PORTFOLIO_TS, String(localPortfolioTs));
