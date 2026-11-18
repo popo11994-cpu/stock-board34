@@ -273,6 +273,12 @@
 
       <!-- News Cards Grid -->
       <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      <div id="news-more-wrap" class="hidden mt-3 text-center">
+        <button id="btn-news-more" type="button"
+          class="px-4 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition">
+          載入更多新聞
+        </button>
+      </div>
     </section>
   </main>
 
@@ -2236,6 +2242,7 @@
 
     let newsFilterSymbol = 'ALL';
     let newsLangZh = true;
+    let newsDisplayLimit = 18;
     let newsItems = [...DEMO_NEWS];
     let lastNewsFetchMs = 0;
     let isFetchingNews = false;
@@ -2344,23 +2351,23 @@
     function matchSymbolFromTitle(title, candidateSymbols) {
       const t = String(title || '').toLowerCase();
       const kwMap = {
-        NVDA: ['nvidia', 'nvda'],
+        NVDA: ['nvidia', 'nvda', 'jensen huang', 'blackwell'],
         NVDL: ['nvidia', 'nvdl'],
-        TSLA: ['tesla', 'tsla'],
+        TSLA: ['tesla', 'tsla', 'cybercab', 'robotaxi'],
         TSLL: ['tesla', 'tsll'],
-        MSFT: ['microsoft', 'msft'],
+        MSFT: ['microsoft', 'msft', 'azure', 'copilot'],
         AMZN: ['amazon', 'amzn', 'aws'],
-        AAPL: ['apple', 'aapl'],
-        GOOG: ['alphabet', 'google', 'goog'],
+        AAPL: ['apple', 'aapl', 'iphone'],
+        GOOG: ['alphabet', 'google', 'goog', 'gemini', 'waymo'],
         GGLL: ['alphabet', 'google', 'ggll'],
-        META: ['meta', 'instagram', 'facebook'],
+        META: ['meta', 'instagram', 'facebook', 'whatsapp', 'zuckerberg'],
         PLTR: ['palantir', 'pltr'],
-        SPCX: ['spacex', 'starship', 'spcx'],
-        QQQ:  ['nasdaq', 'qqq'],
+        SPCX: ['spacex', 'starship', 'spcx', 'starlink'],
+        QQQ:  ['nasdaq', 'qqq', 'tech stocks'],
         TQQQ: ['nasdaq', 'tqqq'],
-        IVV:  ['s&p 500', 'ivv'],
+        IVV:  ['s&p 500', 'ivv', 'wall street'],
         UPRO: ['s&p 500', 'upro'],
-        FBTC: ['bitcoin', 'fbtc'],
+        FBTC: ['bitcoin', 'fbtc', 'btc'],
         SE:   ['sea limited', 'shopee'],
         U:    ['unity software'],
         FLG:  ['flagstar'],
@@ -2395,16 +2402,20 @@
         const hasTw = querySyms.some(s => isTaiwanSymbol(s));
         const terms = hasTw && querySyms.length === 1 ? `(${combinedQuery})` : `(${combinedQuery}) sourcelang:eng`;
 
-        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(terms)}&mode=ArtList&maxrecords=30&timespan=5d&sort=DateDesc&format=json`;
+        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(terms)}&mode=ArtList&maxrecords=75&timespan=7d&sort=DateDesc&format=json`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.articles) && data.articles.length > 0) {
             const seen = new Set();
+            const seenTitles = new Set();
             const fetched = [];
             for (const a of data.articles) {
               if (!a || !a.url || !a.title || seen.has(a.url)) continue;
+              const normTitle = a.title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '').slice(0, 40);
+              if (normTitle && seenTitles.has(normTitle)) continue;
               seen.add(a.url);
+              if (normTitle) seenTitles.add(normTitle);
               const sym = explicitSymbol || matchSymbolFromTitle(a.title, heldSymbols);
               if (!sym) continue;
               fetched.push({
@@ -2525,7 +2536,7 @@
         .filter(n => activeSet.has(n.symbol))
         .filter(n => newsFilterSymbol === 'ALL' || n.symbol === newsFilterSymbol)
         .sort((a, b) => (b.datetime || 0) - (a.datetime || 0))
-        .slice(0, 12);
+        .slice(0, newsDisplayLimit);
 
       if (filtered.length === 0) {
         grid.innerHTML = `<div class="col-span-full py-8 text-center text-xs text-slate-400">目前沒有符合篩選條件的持股新聞</div>`;
@@ -2576,6 +2587,14 @@
         grid.appendChild(card);
       });
 
+      const totalMatching = newsItems
+        .filter(n => activeSet.has(n.symbol))
+        .filter(n => newsFilterSymbol === 'ALL' || n.symbol === newsFilterSymbol).length;
+      const moreWrap = document.getElementById('news-more-wrap');
+      if (moreWrap) {
+        moreWrap.classList.toggle('hidden', totalMatching <= newsDisplayLimit);
+      }
+
       if (triggerTranslate && newsLangZh) {
         const needTranslate = filtered.filter(i => i._live && (!i.headlineZh || (i.summary && !i.summaryZh)));
         if (needTranslate.length > 0) translateVisibleLiveNews(needTranslate);
@@ -2599,7 +2618,7 @@
         targetSymbols = [...stocks]
           .filter(s => (Number(s.shares) || 0) > 0)
           .sort((a, b) => getMarketValue(b) - getMarketValue(a))
-          .slice(0, 6)
+          .slice(0, 8)
           .map(s => s.symbol);
         if (newsFilterSymbol !== 'ALL' && !targetSymbols.includes(newsFilterSymbol)) {
           targetSymbols.push(newsFilterSymbol);
@@ -2616,7 +2635,7 @@
           if (res.ok) {
             const arr = await res.json();
             if (Array.isArray(arr)) {
-              arr.slice(0, 4).forEach(n => {
+              arr.slice(0, 6).forEach(n => {
                 if (n && n.headline && n.url) {
                   fetched.push({
                     symbol: sym,
@@ -2718,6 +2737,11 @@
       }
       window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer');
     }
+
+    document.getElementById('btn-news-more').addEventListener('click', () => {
+      newsDisplayLimit += 12;
+      renderNewsGrid();
+    });
 
     document.getElementById('btn-news-lang').addEventListener('click', (e) => {
       newsLangZh = !newsLangZh;
