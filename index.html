@@ -111,6 +111,14 @@
                 </button>
               </div>
 
+              <div class="pt-2 border-t border-slate-100">
+                <button id="btn-sync-modal" type="button"
+                  class="w-full px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 transition flex items-center justify-between gap-2">
+                  <span>☁️ 跨裝置雲端同步</span>
+                  <span id="sync-badge-label" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">未設定</span>
+                </button>
+              </div>
+
               <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
                 <span class="text-xs font-medium text-slate-600">更新頻率</span>
                 <select id="select-interval" aria-label="更新頻率"
@@ -437,10 +445,26 @@
         </table>
       </div>
 
-      <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50 rounded-b-2xl">
-        <button id="mm-reset" type="button" class="text-xs text-slate-500 hover:text-slate-900 font-medium">
-          恢復預設 21 檔配置
-        </button>
+      <!-- Quick Sync Code Bar (No-Token Fallback) -->
+      <div id="mm-import-box" class="hidden px-5 py-2.5 bg-slate-100 border-t border-slate-200 flex items-center gap-2">
+        <input id="mm-import-input" type="text" placeholder="貼上從另一台裝置複製的持股同步碼..."
+          class="flex-1 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        <button id="mm-import-apply" type="button" class="px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg shrink-0">套用匯入</button>
+      </div>
+
+      <div class="px-5 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50 rounded-b-2xl">
+        <div class="flex items-center gap-3">
+          <button id="mm-reset" type="button" class="text-xs text-slate-500 hover:text-slate-900 font-medium">
+            恢復預設 21 檔
+          </button>
+          <span class="text-slate-300">|</span>
+          <button id="mm-export-code" type="button" class="text-xs text-blue-600 hover:underline font-medium">
+            複製同步碼
+          </button>
+          <button id="mm-toggle-import" type="button" class="text-xs text-blue-600 hover:underline font-medium">
+            匯入同步碼
+          </button>
+        </div>
         <button id="mm-done" type="button" class="px-4 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg">
           完成
         </button>
@@ -466,6 +490,60 @@
       <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex items-center justify-between text-xs text-slate-500">
         <span id="alloc-summary-text">共 0 檔持股</span>
         <button id="am-alloc-done" type="button" class="px-4 py-1.5 bg-slate-900 text-white font-semibold rounded-lg">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GitHub Gist Cloud Sync Modal -->
+  <div id="sync-modal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 border border-slate-200">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">GitHub Gist 跨裝置雲端同步</h2>
+          <p class="text-xs text-slate-500 mt-0.5">任一裝置修改持股後自動上傳，其他裝置開啟即同步</p>
+        </div>
+        <button id="sm-close" type="button" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+      </div>
+
+      <ol class="text-xs text-slate-600 space-y-1.5 bg-slate-50 rounded-xl p-3 mb-3.5 list-decimal list-inside">
+        <li>前往 <a href="https://github.com/settings/tokens/new?scopes=gist&description=StockTreemapSync" target="_blank" rel="noopener noreferrer" class="text-blue-600 font-semibold hover:underline">GitHub 產生 Gist Token</a>（已預設僅勾選 <code class="bg-slate-200 px-1 rounded">gist</code> 權限）。</li>
+        <li>第一台裝置只需貼上 Token，<strong>Gist ID 留空</strong>按「儲存並建立雲端同步」，系統會自動建立私人 Gist 並產生一組 ID。</li>
+        <li>在第二台裝置（例如手機）貼上<strong>同一組 Token 與 Gist ID</strong> 即可雙向同步。</li>
+      </ol>
+
+      <div class="space-y-3 mb-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="sync-token-input">GitHub Personal Access Token (僅需 gist 權限)</label>
+          <input id="sync-token-input" type="password" placeholder="ghp_..."
+            class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="sync-gist-input">私人 Gist ID（第一台裝置可留空自動建立）</label>
+          <div class="flex items-center gap-1.5">
+            <input id="sync-gist-input" type="text" placeholder="自動建立或貼上既有 Gist ID..."
+              class="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            <button id="sm-copy-gist" type="button" class="px-2.5 py-1.5 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 shrink-0">複製</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="sm-manual-actions" class="hidden grid grid-cols-2 gap-2 mb-4">
+        <button id="sm-push" type="button" class="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700">
+          ↑ 立即上傳覆蓋雲端
+        </button>
+        <button id="sm-pull" type="button" class="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700">
+          ↓ 立即從雲端下載
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
+        <button id="sm-clear" type="button" class="text-xs text-rose-600 hover:underline font-medium">停用同步</button>
+        <div class="flex items-center gap-2">
+          <button id="sm-cancel" type="button" class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
+          <button id="sm-save" type="button" class="px-4 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg">
+            儲存並立即同步
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1372,9 +1450,247 @@
       syncNewsWithHoldings();
     });
 
-    function saveStocks() {
-      safeSetStorage(STORAGE_KEY_STOCKS, JSON.stringify(stocks));
+    const STORAGE_KEY_GIST_TOKEN = 'tm_gist_token_v1';
+    const STORAGE_KEY_GIST_ID = 'tm_gist_id_v1';
+    const STORAGE_KEY_PORTFOLIO_TS = 'tm_portfolio_ts_v1';
+    const GIST_FILENAME = 'stock_treemap_portfolio.json';
+
+    let gistToken = safeGetStorage(STORAGE_KEY_GIST_TOKEN) || '';
+    let gistId = safeGetStorage(STORAGE_KEY_GIST_ID) || '';
+    let localPortfolioTs = parseInt(safeGetStorage(STORAGE_KEY_PORTFOLIO_TS) || '0', 10) || 0;
+    let gistPushTimer = null;
+
+    function updateSyncBadge() {
+      const badge = document.getElementById('sync-badge-label');
+      const manualBox = document.getElementById('sm-manual-actions');
+      if (gistToken && gistId) {
+        if (badge) {
+          badge.textContent = '已連線';
+          badge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700';
+        }
+        if (manualBox) manualBox.classList.remove('hidden');
+      } else {
+        if (badge) {
+          badge.textContent = '未設定';
+          badge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600';
+        }
+        if (manualBox) manualBox.classList.add('hidden');
+      }
     }
+
+    function buildSyncPayload() {
+      return {
+        version: 1,
+        updatedAt: localPortfolioTs || Date.now(),
+        stocks: stocks.map(s => ({
+          symbol: s.symbol,
+          name: s.name,
+          shares: s.shares,
+          leverage: getLeverage(s),
+          currency: getCurrency(s),
+          price: s.price,
+          pct: s.pct,
+          color: s.color
+        }))
+      };
+    }
+
+    async function pushToGist(showSuccessToast = false) {
+      if (!gistToken) return null;
+      const payloadStr = JSON.stringify(buildSyncPayload(), null, 2);
+      try {
+        if (!gistId) {
+          const res = await fetch('https://api.github.com/gists', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${gistToken}`
+            },
+            body: JSON.stringify({
+              description: 'Stock Treemap Portfolio Sync',
+              public: false,
+              files: { [GIST_FILENAME]: { content: payloadStr } }
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.id) {
+              gistId = data.id;
+              safeSetStorage(STORAGE_KEY_GIST_ID, gistId);
+              const gistInp = document.getElementById('sync-gist-input');
+              if (gistInp) gistInp.value = gistId;
+              updateSyncBadge();
+              if (showSuccessToast) showToast('已建立私人雲端 Gist 並完成同步！');
+              return true;
+            }
+          }
+        } else {
+          const res = await fetch(`https://api.github.com/gists/${encodeURIComponent(gistId)}`, {
+            method: 'PATCH',
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${gistToken}`
+            },
+            body: JSON.stringify({
+              files: { [GIST_FILENAME]: { content: payloadStr } }
+            })
+          });
+          if (res.ok) {
+            if (showSuccessToast) showToast('已將最新持股上傳至雲端 Gist');
+            return true;
+          }
+        }
+      } catch (e) {}
+      if (showSuccessToast) showToast('雲端同步失敗，請確認 Token 與 Gist ID');
+      return false;
+    }
+
+    async function pullFromGist(forceOverwrite = false) {
+      if (!gistToken || !gistId) return false;
+      try {
+        const res = await fetch(`https://api.github.com/gists/${encodeURIComponent(gistId)}`, {
+          cache: 'no-store',
+          headers: {
+            'Accept': 'application/vnd.github+json',
+            'Authorization': `Bearer ${gistToken}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const file = data && data.files && data.files[GIST_FILENAME];
+          if (file && file.content) {
+            const parsed = JSON.parse(file.content);
+            if (parsed && Array.isArray(parsed.stocks) && parsed.stocks.length > 0) {
+              const remoteTs = Number(parsed.updatedAt) || 0;
+              if (forceOverwrite || remoteTs > localPortfolioTs) {
+                stocks = parsed.stocks;
+                localPortfolioTs = remoteTs || Date.now();
+                safeSetStorage(STORAGE_KEY_STOCKS, JSON.stringify(stocks));
+                safeSetStorage(STORAGE_KEY_PORTFOLIO_TS, String(localPortfolioTs));
+                renderTreemap();
+                syncNewsWithHoldings();
+                if (!manageModal.classList.contains('hidden')) renderManageTable();
+                showToast('已從雲端 Gist 同步最新持股配置');
+                return true;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+      if (forceOverwrite) showToast('無法從雲端下載，請檢查 Gist ID 或 Token');
+      return false;
+    }
+
+    function saveStocks(skipCloudPush = false) {
+      localPortfolioTs = Date.now();
+      safeSetStorage(STORAGE_KEY_STOCKS, JSON.stringify(stocks));
+      safeSetStorage(STORAGE_KEY_PORTFOLIO_TS, String(localPortfolioTs));
+      if (!skipCloudPush && gistToken && gistId) {
+        if (gistPushTimer) clearTimeout(gistPushTimer);
+        gistPushTimer = setTimeout(() => pushToGist(false), 800);
+      }
+    }
+
+    // Sync Modal Events
+    const syncModal = document.getElementById('sync-modal');
+    const syncTokenInput = document.getElementById('sync-token-input');
+    const syncGistInput = document.getElementById('sync-gist-input');
+
+    document.getElementById('btn-sync-modal').addEventListener('click', () => {
+      if (settingsPopover) settingsPopover.classList.add('hidden');
+      syncTokenInput.value = gistToken;
+      syncGistInput.value = gistId;
+      updateSyncBadge();
+      syncModal.classList.remove('hidden');
+    });
+    document.getElementById('sm-close').addEventListener('click', () => syncModal.classList.add('hidden'));
+    document.getElementById('sm-cancel').addEventListener('click', () => syncModal.classList.add('hidden'));
+    syncModal.addEventListener('click', (e) => { if (e.target === syncModal) syncModal.classList.add('hidden'); });
+
+    document.getElementById('sm-copy-gist').addEventListener('click', async () => {
+      const val = syncGistInput.value.trim();
+      if (!val) return;
+      const ok = await copyTextSafe(val);
+      if (ok) showToast('已複製 Gist ID');
+    });
+
+    document.getElementById('sm-save').addEventListener('click', async () => {
+      const tok = syncTokenInput.value.trim();
+      const gid = syncGistInput.value.trim();
+      if (!tok) return;
+      gistToken = tok;
+      gistId = gid;
+      safeSetStorage(STORAGE_KEY_GIST_TOKEN, gistToken);
+      if (gistId) safeSetStorage(STORAGE_KEY_GIST_ID, gistId);
+      else safeRemoveStorage(STORAGE_KEY_GIST_ID);
+      updateSyncBadge();
+
+      if (!gistId) {
+        await pushToGist(true);
+      } else {
+        const pulled = await pullFromGist(true);
+        if (!pulled) await pushToGist(true);
+        syncModal.classList.add('hidden');
+      }
+    });
+
+    document.getElementById('sm-push').addEventListener('click', async () => {
+      await pushToGist(true);
+    });
+    document.getElementById('sm-pull').addEventListener('click', async () => {
+      await pullFromGist(true);
+    });
+    document.getElementById('sm-clear').addEventListener('click', () => {
+      gistToken = '';
+      gistId = '';
+      safeRemoveStorage(STORAGE_KEY_GIST_TOKEN);
+      safeRemoveStorage(STORAGE_KEY_GIST_ID);
+      updateSyncBadge();
+      syncModal.classList.add('hidden');
+      showToast('已停用雲端同步');
+    });
+
+    // Quick Sync Code inside Manage Modal (No-Token Fallback)
+    document.getElementById('mm-export-code').addEventListener('click', async () => {
+      try {
+        const json = JSON.stringify(buildSyncPayload());
+        const b64 = btoa(unescape(encodeURIComponent(json)));
+        const ok = await copyTextSafe(b64);
+        if (ok) showToast('已複製持股同步碼！到另一台裝置貼上匯入即可');
+      } catch (e) {}
+    });
+
+    document.getElementById('mm-toggle-import').addEventListener('click', () => {
+      const box = document.getElementById('mm-import-box');
+      if (box) {
+        box.classList.toggle('hidden');
+        if (!box.classList.contains('hidden')) document.getElementById('mm-import-input').focus();
+      }
+    });
+
+    document.getElementById('mm-import-apply').addEventListener('click', () => {
+      const inp = document.getElementById('mm-import-input');
+      const raw = (inp ? inp.value : '').trim();
+      if (!raw) return;
+      try {
+        const json = decodeURIComponent(escape(atob(raw)));
+        const parsed = JSON.parse(json);
+        if (parsed && Array.isArray(parsed.stocks) && parsed.stocks.length > 0) {
+          stocks = parsed.stocks;
+          saveStocks();
+          renderManageTable();
+          renderTreemap();
+          syncNewsWithHoldings();
+          inp.value = '';
+          document.getElementById('mm-import-box').classList.add('hidden');
+          showToast('已成功匯入同步碼並更新持股！');
+          return;
+        }
+      } catch (e) {}
+      showToast('同步碼格式不正確，請重新複製貼上');
+    });
 
     // Color mode toggle
     const colorBtn = document.getElementById('btn-color-mode');
@@ -2537,6 +2853,8 @@
     window.addEventListener('DOMContentLoaded', () => {
       updateMarketFilterUI();
       updateStatusUI();
+      updateSyncBadge();
+      if (gistToken && gistId) pullFromGist(false);
       renderTreemap();
       renderNewsFilters();
       renderNewsGrid();
