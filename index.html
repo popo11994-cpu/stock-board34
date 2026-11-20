@@ -1573,13 +1573,6 @@
     });
 
     function renderTreemap(changedSymbols = new Set()) {
-      const isNarrow = stageEl.clientWidth < 500;
-      stageEl.style.minHeight = isNarrow ? '640px' : '560px';
-      const rect = stageEl.getBoundingClientRect();
-      const width = rect.width;
-      const height = Math.max(rect.height, isNarrow ? 640 : 560);
-      const gap = width < 500 ? 4 : 6;
-
       const visibleStocks = getVisibleStocks();
       const activeVis = visibleStocks.filter(s => (Number(s.shares) || 0) > 0);
       const totalVisMV = activeVis.reduce((sum, d) => sum + getMarketValue(d), 0);
@@ -1597,6 +1590,13 @@
         stageEl.classList.remove('hidden');
         if (rankingStage) rankingStage.classList.add('hidden');
       }
+
+      const isNarrow = stageEl.clientWidth < 500;
+      stageEl.style.minHeight = isNarrow ? '640px' : '560px';
+      const rect = stageEl.getBoundingClientRect();
+      const width = rect.width;
+      const height = Math.max(rect.height, isNarrow ? 640 : 560);
+      const gap = width < 500 ? 4 : 6;
 
       const layout = computeTreemap(visibleStocks, 0, 0, width, height);
       stageEl.innerHTML = '';
