@@ -41,12 +41,34 @@
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    /* Dark Mode Overrides */
+    body.dark-mode { background-color: #0b1120; color: #f1f5f9; }
+    body.dark-mode header,
+    body.dark-mode .bg-white { background-color: #111827 !important; color: #f1f5f9; }
+    body.dark-mode .bg-slate-50,
+    body.dark-mode .bg-slate-50\/50 { background-color: #1e293b !important; }
+    body.dark-mode .bg-slate-100 { background-color: #1e293b !important; }
+    body.dark-mode .border-slate-200,
+    body.dark-mode .border-slate-100,
+    body.dark-mode .border-slate-300 { border-color: #334155 !important; }
+    body.dark-mode .text-slate-950,
+    body.dark-mode .text-slate-900,
+    body.dark-mode .text-slate-800 { color: #f8fafc !important; }
+    body.dark-mode .text-slate-700,
+    body.dark-mode .text-slate-600 { color: #cbd5e1 !important; }
+    body.dark-mode .text-slate-500,
+    body.dark-mode .text-slate-400 { color: #94a3b8 !important; }
+    body.dark-mode input,
+    body.dark-mode select { background-color: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
+    body.dark-mode .mf-btn.bg-white,
+    body.dark-mode .vm-btn.bg-white,
+    body.dark-mode .hm-mode-btn.bg-white { background-color: #334155 !important; color: #ffffff !important; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
   <!-- Top Control Bar -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+  <header class="bg-white border-b border-slate-200 relative z-30">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 space-y-2">
       <!-- Row 1: Brand + Primary Quick Actions -->
       <div class="flex items-center justify-between gap-2">
@@ -140,6 +162,14 @@
               </div>
 
               <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <span class="text-xs font-medium text-slate-600">主題外觀</span>
+                <button id="btn-theme-mode" type="button"
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition">
+                  淺色模式
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
                 <span class="text-xs font-medium text-slate-600">預覽模式</span>
                 <button id="btn-demo-live" type="button"
                   class="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5">
@@ -177,45 +207,23 @@
 
   <!-- Summary Strip -->
   <div class="max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-1 space-y-2.5">
-    <!-- Primary KPI Cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-      <div class="col-span-2 sm:col-span-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
-        <div class="flex items-center justify-between gap-2 text-xs sm:text-sm font-medium text-slate-500">
+    <!-- Primary KPI Cards (4 Core Cards: Total, US, TW, Weighted Change) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <!-- Card 1: 股票總市值 -->
+      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
+        <div class="flex items-center justify-between gap-1.5 text-xs sm:text-sm font-medium text-slate-500">
           <span>股票總市值</span>
           <button id="btn-display-currency" type="button"
             class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition"
-            title="點擊切換方塊內市值顯示幣別 (USD / TWD)">TWD</button>
+            title="點擊切換幣別 (USD / TWD)">TWD</button>
         </div>
         <div class="mt-1">
-          <strong id="stat-total-value" class="text-lg sm:text-xl font-extrabold text-slate-950 tracking-tight">NT$0</strong>
+          <strong id="stat-total-value" class="text-base sm:text-xl font-extrabold text-slate-950 tracking-tight">NT$0</strong>
         </div>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
-        <span class="text-xs sm:text-sm font-medium text-slate-500">美股總市值</span>
-        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
-          <strong id="stat-us-twd" class="text-base sm:text-lg font-bold text-slate-900">NT$0</strong>
-          <span id="stat-us-usd" class="text-xs sm:text-sm text-slate-400 font-medium">($0)</span>
-        </div>
-      </div>
-
-      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
-        <span class="text-xs sm:text-sm font-medium text-slate-500">台股總市值</span>
-        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
-          <strong id="stat-tw-twd" class="text-base sm:text-lg font-bold text-slate-900">NT$0</strong>
-          <span id="stat-tw-sub" class="text-xs sm:text-sm text-slate-400 font-medium"></span>
-        </div>
-      </div>
-
-      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between" title="依各持股「市值 × 槓桿倍數」加總後除以總市值計算">
-        <span class="text-xs sm:text-sm font-medium text-slate-500">總槓桿比例</span>
-        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
-          <strong id="stat-leverage" class="text-base sm:text-lg font-extrabold text-slate-900">1.00x</strong>
-          <span id="stat-exposure" class="text-xs text-slate-400 font-medium"></span>
-        </div>
-      </div>
-
-      <div class="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
+      <!-- Card 2: 加權漲跌 -->
+      <div class="lg:order-4 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-col justify-between">
         <div class="flex items-center justify-between gap-1.5">
           <span class="text-xs sm:text-sm font-medium text-slate-500 shrink-0">加權漲跌</span>
           <span class="text-[11px] text-slate-500 whitespace-nowrap bg-slate-100 px-1.5 py-0.5 rounded font-medium"><strong id="stat-updown" class="text-slate-800">0漲 21跌</strong></span>
@@ -225,29 +233,90 @@
           <span id="stat-day-pnl" class="text-xs sm:text-sm font-semibold whitespace-nowrap">NT$0</span>
         </div>
       </div>
+
+      <!-- Card 3: 美股總市值 -->
+      <div id="kpi-card-us" class="flex bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex-col justify-between">
+        <span class="text-xs sm:text-sm font-medium text-slate-500">美股總市值</span>
+        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
+          <strong id="stat-us-twd" class="text-base sm:text-lg font-bold text-slate-900">NT$0</strong>
+          <span id="stat-us-usd" class="text-xs sm:text-sm text-slate-400 font-medium">($0)</span>
+        </div>
+      </div>
+
+      <!-- Card 4: 台股總市值 -->
+      <div id="kpi-card-tw" class="flex bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-2xs flex-col justify-between">
+        <span class="text-xs sm:text-sm font-medium text-slate-500">台股總市值</span>
+        <div class="mt-1 flex flex-wrap items-baseline gap-1.5">
+          <strong id="stat-tw-twd" class="text-base sm:text-lg font-bold text-slate-900">NT$0</strong>
+          <span id="stat-tw-sub" class="text-xs sm:text-sm text-slate-400 font-medium"></span>
+        </div>
+      </div>
     </div>
 
-    <!-- Secondary Info Pills -->
-    <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
-      <div class="flex flex-wrap items-center gap-2.5">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 font-medium">
-          <span>持股檔數：</span>
-          <strong id="stat-count" class="text-slate-900 font-bold">21</strong>
-          <span>檔</span>
-        </span>
-        <span id="fx-live-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 font-medium">
-          <span>USD/TWD：</span>
-          <strong id="fx-live-val" class="text-slate-900 font-bold">32.50</strong>
-        </span>
+    <!-- Collapsible Secondary Details (Desktop & Mobile) -->
+    <div class="space-y-2">
+      <button id="btn-toggle-kpi-details" type="button"
+        class="w-full sm:w-auto py-1.5 px-3.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-600 inline-flex items-center justify-center gap-1.5 transition">
+        <span id="kpi-toggle-label">展開總槓桿 / 持股檔數 / 匯率明細 ▾</span>
+      </button>
+
+      <div id="kpi-secondary-pills" class="hidden flex-wrap items-stretch gap-2.5 text-xs sm:text-sm text-slate-600">
+        <button id="btn-leverage-card" type="button"
+          class="w-full sm:w-auto text-left bg-white hover:border-slate-300 border border-slate-200 rounded-xl px-3.5 py-2 shadow-2xs flex flex-col justify-between transition cursor-pointer"
+          title="點擊查看總槓桿比例拆解">
+          <div class="flex items-center justify-between gap-3 w-full">
+            <span class="text-xs font-medium text-slate-500">總槓桿比例</span>
+            <span class="text-[10px] text-blue-600 font-semibold">明細 ↗</span>
+          </div>
+          <div class="mt-0.5 flex flex-wrap items-baseline gap-1.5">
+            <strong id="stat-leverage" class="text-sm sm:text-base font-extrabold text-slate-900">1.00x</strong>
+            <span id="stat-exposure" class="text-xs text-slate-400 font-medium"></span>
+          </div>
+        </button>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 font-medium">
+            <span>持股檔數：</span>
+            <strong id="stat-count" class="text-slate-900 font-bold">21</strong>
+            <span>檔</span>
+          </span>
+          <span id="fx-live-pill" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 font-medium">
+            <span>USD/TWD：</span>
+            <strong id="fx-live-val" class="text-slate-900 font-bold">32.50</strong>
+          </span>
+        </div>
       </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
       <div id="api-error-banner" class="hidden text-rose-600 font-medium bg-rose-50 border border-rose-200 px-3 py-1 rounded-lg"></div>
     </div>
   </div>
 
   <!-- Main Treemap Container -->
-  <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 flex-1 flex flex-col">
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-3 flex-1 flex flex-col">
-      <div id="treemap-stage" class="relative w-full flex-1 min-h-[640px] sm:min-h-[620px]"></div>
+  <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-16 flex-1 flex flex-col">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2.5 sm:p-3.5 flex-1 flex flex-col">
+      <!-- View Mode Bar (熱力圖 / 漲跌排行) -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
+        <div id="view-mode-group" class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs font-semibold">
+          <button type="button" data-vm="treemap" class="vm-btn px-3 py-1 rounded-md bg-white text-slate-900 shadow-2xs transition">熱力圖</button>
+          <button type="button" data-vm="ranking" class="vm-btn px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">漲跌排行</button>
+        </div>
+        <div id="ranking-sort-bar" class="hidden flex items-center gap-1.5 text-xs">
+          <span class="text-slate-400">排序：</span>
+          <select id="ranking-sort-select" aria-label="排行排序方式"
+            class="px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700">
+            <option value="pct_desc">漲幅由高到低</option>
+            <option value="pct_asc">跌幅由重到輕</option>
+            <option value="pnl_desc">當日賺最多</option>
+            <option value="pnl_asc">當日賠最多</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="treemap-stage" class="relative w-full flex-1 min-h-[640px] sm:min-h-[560px] overflow-hidden"></div>
+      <div id="ranking-stage" class="hidden divide-y divide-slate-100"></div>
+
     </div>
 
     <!-- Holdings Related News Section -->
@@ -274,7 +343,7 @@
       </div>
 
       <!-- Ticker Filter Pills -->
-      <div id="news-filter-bar" class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3"></div>
+      <div id="news-filter-bar" class="flex flex-wrap items-center gap-1.5 mb-3.5"></div>
 
       <!-- News Cards Grid -->
       <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
@@ -286,6 +355,12 @@
       </div>
     </section>
   </main>
+
+  <!-- Floating Back to Top Button -->
+  <button id="btn-back-to-top" type="button" aria-label="回到頂部"
+    class="fixed bottom-5 right-5 z-40 hidden px-3 py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-semibold shadow-lg backdrop-blur-xs transition flex items-center gap-1">
+    <span>↑ 回到熱力圖</span>
+  </button>
 
   <!-- Floating Tooltip -->
   <div id="tooltip" class="fixed pointer-events-none z-50 hidden bg-slate-900/95 text-white rounded-xl px-3.5 py-2.5 shadow-xl text-xs max-w-[270px] backdrop-blur-sm">
@@ -355,6 +430,18 @@
           <option value="-3">-3x (三倍反向)</option>
         </select>
       </div>
+      <div class="mb-3 bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2 text-xs">
+        <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+          <input id="dm-lock-price" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-900" />
+          <span>🔒 鎖定自訂現價（不被 API 自動覆蓋，適合 SPCX 等自訂標的）</span>
+        </label>
+        <div id="dm-custom-price-row" class="hidden flex items-center gap-2">
+          <input id="dm-custom-price-input" type="number" min="0.0001" step="any" placeholder="輸入自訂現價..."
+            class="flex-1 px-2.5 py-1 text-xs border border-slate-200 rounded-lg bg-white" />
+          <button id="dm-save-price" type="button" class="px-3 py-1 bg-slate-900 text-white text-xs font-semibold rounded-lg">套用現價</button>
+        </div>
+      </div>
+
       <div class="mb-4">
         <label class="block text-xs font-semibold text-slate-700 mb-1.5" for="dm-shares-input">增減持有股數（即時重算市值與方塊面積）</label>
         <div class="flex items-center gap-2">
@@ -644,6 +731,49 @@
     </div>
   </div>
 
+  <!-- Leverage Breakdown Modal -->
+  <div id="leverage-modal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 border border-slate-200">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">投資組合總槓桿拆解</h2>
+          <p class="text-xs text-slate-500">檢視原型部位與槓桿型 ETF 的真實曝險結構</p>
+        </div>
+        <button id="lm-close" type="button" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5 bg-slate-50 rounded-xl p-3.5 mb-3 text-xs">
+        <div>
+          <div class="text-slate-400">整體總槓桿</div>
+          <div id="lm-total-lev" class="text-xl font-extrabold text-slate-900">1.00x</div>
+        </div>
+        <div>
+          <div class="text-slate-400">總曝險金額</div>
+          <div id="lm-total-exp" class="text-base font-bold text-slate-900">--</div>
+        </div>
+      </div>
+
+      <div class="mb-4 space-y-1.5 text-xs">
+        <div class="flex justify-between font-semibold">
+          <span class="text-slate-700">1x 原型部位：<span id="lm-1x-pct">0%</span></span>
+          <span class="text-amber-600">槓桿型 ETF (2x/3x)：<span id="lm-lev-pct">0%</span></span>
+        </div>
+        <div class="w-full h-2.5 bg-amber-100 rounded-full overflow-hidden flex">
+          <div id="lm-1x-bar" class="bg-slate-800 h-full" style="width: 100%"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="text-xs font-bold text-slate-700 mb-2">真實曝險前 5 大標的（市值 × 倍數）</div>
+        <div id="lm-top5-list" class="divide-y divide-slate-100 text-xs"></div>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 text-right">
+        <button id="lm-done" type="button" class="px-4 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg">關閉</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast-banner" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2 max-w-[90vw]">
     <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
@@ -855,6 +985,10 @@
     let marketFilter = safeGetStorage(STORAGE_KEY_MARKET_FILTER) || 'ALL';
     const STORAGE_KEY_HIDE_AMOUNTS = 'tm_hide_amounts_v1';
     let hideAmounts = safeGetStorage(STORAGE_KEY_HIDE_AMOUNTS) === '1';
+    const STORAGE_KEY_THEME = 'tm_theme_v1';
+    let darkMode = safeGetStorage(STORAGE_KEY_THEME) === 'dark';
+    let viewMode = 'treemap'; // 'treemap' | 'ranking'
+    let kpiDetailsExpanded = false;
 
     function getVisibleStocks() {
       if (marketFilter === 'USD') return stocks.filter(s => getCurrency(s) === 'USD');
@@ -1270,11 +1404,13 @@
           tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">尚無符合條件的歷史紀錄</td></tr>`;
         } else {
           tbody.innerHTML = rows.map(r => {
+            const maskTWD = (v) => hideAmounts ? '••••••' : `NT$${Number(v || 0).toLocaleString('zh-TW')}`;
+            const maskUSD = (v) => hideAmounts ? '••••••' : `$${Number(v || 0).toLocaleString('en-US')}`;
             if (historyViewMode === 'TOTAL') {
               return `
                 <tr class="hover:bg-slate-50">
                   <td class="py-2 px-3 font-semibold text-slate-900 whitespace-nowrap">${escapeHtml(r.date)}</td>
-                  <td class="py-2 px-3 text-right font-bold text-slate-900 whitespace-nowrap">NT$${Number(r.totalTWD || 0).toLocaleString('zh-TW')}</td>
+                  <td class="py-2 px-3 text-right font-bold text-slate-900 whitespace-nowrap">${maskTWD(r.totalTWD)}</td>
                   <td class="py-2 px-3 text-right text-slate-500 whitespace-nowrap">${Number(r.fx || 32.5).toFixed(2)}</td>
                   <td class="py-2 px-3 text-right text-slate-600 whitespace-nowrap">${Number(r.leverage || 1).toFixed(2)}x</td>
                   <td class="py-2 px-3 text-right"><button type="button" data-del-date="${escapeHtml(r.date)}" class="hm-del text-slate-400 hover:text-rose-600 font-medium">刪除</button></td>
@@ -1284,7 +1420,7 @@
               return `
                 <tr class="hover:bg-slate-50">
                   <td class="py-2 px-3 font-semibold text-slate-900 whitespace-nowrap">${escapeHtml(r.date)}</td>
-                  <td class="py-2 px-3 text-right font-bold text-teal-700 whitespace-nowrap">NT$${Number(r.twTWD || 0).toLocaleString('zh-TW')}</td>
+                  <td class="py-2 px-3 text-right font-bold text-teal-700 whitespace-nowrap">${maskTWD(r.twTWD)}</td>
                   <td class="py-2 px-3 text-right text-slate-600 whitespace-nowrap">${twRatio}%</td>
                   <td class="py-2 px-3 text-right"><button type="button" data-del-date="${escapeHtml(r.date)}" class="hm-del text-slate-400 hover:text-rose-600 font-medium">刪除</button></td>
                 </tr>`;
@@ -1292,8 +1428,8 @@
               return `
                 <tr class="hover:bg-slate-50">
                   <td class="py-2 px-3 font-semibold text-slate-900 whitespace-nowrap">${escapeHtml(r.date)}</td>
-                  <td class="py-2 px-3 text-right font-bold text-blue-700 whitespace-nowrap">NT$${Number(r.usTWD || 0).toLocaleString('zh-TW')}</td>
-                  <td class="py-2 px-3 text-right text-slate-600 whitespace-nowrap">$${Number(r.usUSD || 0).toLocaleString('en-US')}</td>
+                  <td class="py-2 px-3 text-right font-bold text-blue-700 whitespace-nowrap">${maskTWD(r.usTWD)}</td>
+                  <td class="py-2 px-3 text-right text-slate-600 whitespace-nowrap">${maskUSD(r.usUSD)}</td>
                   <td class="py-2 px-3 text-right text-slate-500 whitespace-nowrap">${Number(r.fx || 32.5).toFixed(2)}</td>
                   <td class="py-2 px-3 text-right"><button type="button" data-del-date="${escapeHtml(r.date)}" class="hm-del text-slate-400 hover:text-rose-600 font-medium">刪除</button></td>
                 </tr>`;
@@ -1381,6 +1517,7 @@
               tooltip: {
                 callbacks: {
                   label: (ctx) => {
+                    if (hideAmounts) return `${ctx.dataset.label}: ••••••`;
                     const val = `NT$${Number(ctx.parsed.y || 0).toLocaleString('zh-TW')}`;
                     if (historyViewMode === 'US' && asc[ctx.dataIndex]) {
                       return `${ctx.dataset.label}: ${val} ($${Number(asc[ctx.dataIndex].usUSD || 0).toLocaleString('en-US')})`;
@@ -1393,7 +1530,7 @@
             scales: {
               y: {
                 ticks: {
-                  callback: (v) => 'NT$' + Number(v).toLocaleString('zh-TW')
+                  callback: (v) => hideAmounts ? '••••' : ('NT$' + Number(v).toLocaleString('zh-TW'))
                 }
               }
             }
@@ -1436,12 +1573,31 @@
     });
 
     function renderTreemap(changedSymbols = new Set()) {
+      const isNarrow = stageEl.clientWidth < 500;
+      stageEl.style.minHeight = isNarrow ? '640px' : '560px';
       const rect = stageEl.getBoundingClientRect();
       const width = rect.width;
-      const height = Math.max(rect.height, width < 500 ? 640 : 560);
+      const height = Math.max(rect.height, isNarrow ? 640 : 560);
       const gap = width < 500 ? 4 : 6;
 
       const visibleStocks = getVisibleStocks();
+      const activeVis = visibleStocks.filter(s => (Number(s.shares) || 0) > 0);
+      const totalVisMV = activeVis.reduce((sum, d) => sum + getMarketValue(d), 0);
+
+      const rankingStage = document.getElementById('ranking-stage');
+      if (viewMode === 'ranking') {
+        stageEl.classList.add('hidden');
+        if (rankingStage) {
+          rankingStage.classList.remove('hidden');
+          renderRankingView(activeVis, totalVisMV);
+        }
+        renderSummary();
+        return;
+      } else {
+        stageEl.classList.remove('hidden');
+        if (rankingStage) rankingStage.classList.add('hidden');
+      }
+
       const layout = computeTreemap(visibleStocks, 0, 0, width, height);
       stageEl.innerHTML = '';
 
@@ -1604,6 +1760,14 @@
       document.getElementById('dm-hl').textContent = (item.high != null && item.low != null) ? `$${item.high.toFixed(2)} / $${item.low.toFixed(2)}` : '--';
       document.getElementById('dm-pc').textContent = item.pc != null ? `$${item.pc.toFixed(2)}` : '--';
 
+      const lockCb = document.getElementById('dm-lock-price');
+      const customRow = document.getElementById('dm-custom-price-row');
+      const customInp = document.getElementById('dm-custom-price-input');
+      if (lockCb && customRow && customInp) {
+        lockCb.checked = Boolean(item.lockedPrice);
+        customRow.classList.toggle('hidden', !item.lockedPrice);
+        customInp.value = item.price != null ? item.price : '';
+      }
       document.getElementById('dm-shares-input').value = item.shares;
       document.getElementById('dm-leverage-select').value = String(getLeverage(item));
       const yhSym = getCurrency(item) === 'TWD' && !item.symbol.includes('.') ? `${item.symbol}.TW` : item.symbol;
@@ -2293,6 +2457,7 @@
         let okCount = 0;
         for (let i = 0; i < twStocks.length; i++) {
           const item = twStocks[i];
+          if (item.lockedPrice) continue;
           const code = item.symbol.replace(/\.(TW|TWO)$/i, '').trim();
           try {
             const url = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${encodeURIComponent(code)}`;
@@ -2303,6 +2468,7 @@
               const data = await res.json();
               const latest = data && (data.lastPrice || data.closePrice || data.previousClose);
               if (typeof latest === 'number' && latest > 0) {
+                if (item.lockedPrice) continue;
                 if (item.price !== latest) changed.add(item.symbol);
                 item.price = latest;
                 item.isLivePrice = true;
@@ -2337,7 +2503,7 @@
             twStocks.forEach(item => {
               const code = item.symbol.replace(/\.(TW|TWO)$/i, '').trim();
               const row = byCode.get(code);
-              if (row && row.ClosingPrice) {
+              if (!item.lockedPrice && row && row.ClosingPrice) {
                 const close = parseFloat(String(row.ClosingPrice).replace(/,/g, ''));
                 const chg = parseFloat(String(row.Change || '0').replace(/,/g, '')) || 0;
                 if (!isNaN(close) && close > 0) {
@@ -2373,6 +2539,33 @@
       });
     }
 
+    function getUsMarketSession() {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(new Date());
+      const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
+      const wd = map.weekday; // Sun, Mon, Tue, Wed, Thu, Fri, Sat
+      const h = parseInt(map.hour, 10) % 24;
+      const m = parseInt(map.minute, 10);
+      const mins = h * 60 + m;
+
+      if (wd === 'Sat') return { code: 'closed', label: '週末休市' };
+      if (wd === 'Sun') {
+        return mins >= 1200 ? { code: 'overnight', label: '🌙 夜盤 24/5' } : { code: 'closed', label: '週末休市' };
+      }
+      if (wd === 'Fri' && mins >= 1200) {
+        return { code: 'closed', label: '週末休市' };
+      }
+      if (mins >= 240 && mins < 570) return { code: 'pre', label: '🌅 盤前' };
+      if (mins >= 570 && mins < 960) return { code: 'regular', label: '☀️ 盤中' };
+      if (mins >= 960 && mins < 1200) return { code: 'post', label: '🌆 盤後' };
+      return { code: 'overnight', label: '🌙 夜盤 24/5' };
+    }
+
     // Live Quotes Fetch (Alpaca Pre/After-hours OR Finnhub Regular)
     async function fetchAllQuotes() {
       if (!hasActiveQuotesAuth() || isFetching) return;
@@ -2389,14 +2582,23 @@
         try {
           const usStocks = stocks.filter(s => getCurrency(s) === 'USD');
           const symbolsCsv = usStocks.map(s => encodeURIComponent(s.symbol)).join(',');
-          const url = `https://data.alpaca.markets/v2/stocks/snapshots?symbols=${symbolsCsv}`;
-          const res = await fetch(url, {
-            headers: {
-              'APCA-API-KEY-ID': alpacaKeyId,
-              'APCA-API-SECRET-KEY': alpacaSecret,
-              'Accept': 'application/json'
+          const session = getUsMarketSession();
+          const headers = {
+            'APCA-API-KEY-ID': alpacaKeyId,
+            'APCA-API-SECRET-KEY': alpacaSecret,
+            'Accept': 'application/json'
+          };
+
+          let res = null;
+          if (session.code === 'overnight') {
+            res = await fetch(`https://data.alpaca.markets/v2/stocks/snapshots?symbols=${symbolsCsv}&feed=overnight`, { headers });
+            if (!res.ok && res.status !== 401 && res.status !== 429) {
+              res = await fetch(`https://data.alpaca.markets/v2/stocks/snapshots?symbols=${symbolsCsv}`, { headers });
             }
-          });
+          } else {
+            res = await fetch(`https://data.alpaca.markets/v2/stocks/snapshots?symbols=${symbolsCsv}`, { headers });
+          }
+
           if (res.status === 401 || res.status === 403) {
             authError = true;
           } else if (res.status === 429) {
@@ -2405,8 +2607,14 @@
             const data = await res.json();
             for (const item of stocks) {
               const snap = data && data[item.symbol];
-              if (snap && snap.latestTrade && typeof snap.latestTrade.p === 'number') {
-                const latest = snap.latestTrade.p;
+              if (!snap) continue;
+              // In overnight feed, indicative quote midpoint can be fresher than 15m-delayed trades
+              const qMid = (snap.latestQuote && snap.latestQuote.bp > 0 && snap.latestQuote.ap > 0)
+                ? Number(((snap.latestQuote.bp + snap.latestQuote.ap) / 2).toFixed(2))
+                : 0;
+              const tradeP = (snap.latestTrade && typeof snap.latestTrade.p === 'number') ? snap.latestTrade.p : 0;
+              const latest = (session.code === 'overnight' && qMid > 0) ? qMid : (tradeP || qMid);
+              if (latest > 0) {
                 const prevClose = (snap.prevDailyBar && snap.prevDailyBar.c) || (snap.dailyBar && snap.dailyBar.o) || item.pc || latest;
                 const chg = latest - prevClose;
                 const pct = prevClose > 0 ? (chg / prevClose) * 100 : 0;
@@ -2427,7 +2635,7 @@
       if (successCount === 0 && !authError && !rateLimited && apiKey) {
         for (let i = 0; i < stocks.length; i++) {
           const item = stocks[i];
-          if (getCurrency(item) === 'TWD') continue;
+          if (getCurrency(item) === 'TWD' || item.lockedPrice) continue;
           try {
             const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(item.symbol)}&token=${encodeURIComponent(apiKey)}`;
             const res = await fetch(url);
@@ -2497,10 +2705,11 @@
       const apiBtnLabel = document.getElementById('api-btn-label');
       if (hasActiveQuotesAuth()) {
         statusDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        const session = getUsMarketSession();
         const usLabel = (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret)
-          ? 'Alpaca 美股'
-          : (apiKey ? 'Finnhub 美股' : '');
-        const twLabel = fugleKey ? 'Fugle 台股即時' : '';
+          ? `Alpaca 美股 (${session.label})`
+          : (apiKey ? `Finnhub 美股 (${session.label})` : '');
+        const twLabel = fugleKey ? 'Fugle 台股' : '';
         statusText.textContent = [usLabel, twLabel].filter(Boolean).join(' + ') || '即時連線';
         apiBtnLabel.textContent = '已連線 API';
       } else if (demoLive) {
@@ -2652,7 +2861,7 @@
 
     let newsFilterSymbol = 'ALL';
     let newsLangZh = true;
-    let newsDisplayLimit = 18;
+    let newsDisplayLimit = 9;
     let newsItems = [...DEMO_NEWS];
     let lastNewsFetchMs = 0;
     let isFetchingNews = false;
@@ -2713,6 +2922,12 @@
     }
 
     const SYMBOL_TERMS_MAP = {
+      '0050':   ['TSMC', 'Taiwan', '0050'],
+      '00631L': ['TSMC', 'Taiwan', '00631L'],
+      '0056':   ['Taiwan', '0056'],
+      '00878':  ['Taiwan', '00878'],
+      '00919':  ['Taiwan', '00919'],
+      '2330':   ['TSMC', 'Taiwan'],
       QQQ:  ['QQQ', 'Nasdaq'],
       IVV:  ['IVV', '"S&P 500"'],
       MSFT: ['Microsoft', 'MSFT'],
@@ -2760,24 +2975,30 @@
     function matchSymbolFromTitle(title, candidateSymbols) {
       const t = String(title || '').toLowerCase();
       const kwMap = {
-        NVDA: ['nvidia', 'nvda', 'jensen huang', 'blackwell'],
-        NVDL: ['nvidia', 'nvdl'],
-        TSLA: ['tesla', 'tsla', 'cybercab', 'robotaxi'],
-        TSLL: ['tesla', 'tsll'],
-        MSFT: ['microsoft', 'msft', 'azure', 'copilot'],
-        AMZN: ['amazon', 'amzn', 'aws'],
-        AAPL: ['apple', 'aapl', 'iphone'],
-        GOOG: ['alphabet', 'google', 'goog', 'gemini', 'waymo'],
-        GGLL: ['alphabet', 'google', 'ggll'],
-        META: ['meta', 'instagram', 'facebook', 'whatsapp', 'zuckerberg'],
+        '0050':   ['0050', '台灣50', '台積電', 'tsmc', '台股', '加權指數'],
+        '00631L': ['00631l', '台灣50正2', '正2', '台股', '台積電'],
+        '0056':   ['0056', '高股息', '台股'],
+        '00878':  ['00878', '國泰永續高股息', '台股'],
+        '00919':  ['00919', '群益台灣精選高息', '台股'],
+        '2330':   ['2330', '台積電', 'tsmc'],
+        NVDA: ['nvidia', 'nvda', 'jensen huang', 'blackwell', '輝達', '黃仁勳'],
+        NVDL: ['nvidia', 'nvdl', '輝達'],
+        TSLA: ['tesla', 'tsla', 'cybercab', 'robotaxi', '特斯拉', '馬斯克'],
+        TSLL: ['tesla', 'tsll', '特斯拉'],
+        MSFT: ['microsoft', 'msft', 'azure', 'copilot', '微軟'],
+        AMZN: ['amazon', 'amzn', 'aws', '亞馬遜'],
+        AAPL: ['apple', 'aapl', 'iphone', '蘋果'],
+        GOOG: ['alphabet', 'google', 'goog', 'gemini', 'waymo', '谷歌'],
+        GGLL: ['alphabet', 'google', 'ggll', '谷歌'],
+        META: ['meta', 'instagram', 'facebook', 'whatsapp', 'zuckerberg', '祖克柏'],
         PLTR: ['palantir', 'pltr'],
         SPCX: ['spacex', 'starship', 'spcx', 'starlink'],
-        QQQ:  ['nasdaq', 'qqq', 'tech stocks'],
-        TQQQ: ['nasdaq', 'tqqq'],
-        IVV:  ['s&p 500', 'ivv', 'wall street'],
-        UPRO: ['s&p 500', 'upro'],
-        FBTC: ['bitcoin', 'fbtc', 'btc'],
-        SE:   ['sea limited', 'shopee'],
+        QQQ:  ['nasdaq', 'qqq', 'tech stocks', '那斯達克', '科技股'],
+        TQQQ: ['nasdaq', 'tqqq', '那斯達克'],
+        IVV:  ['s&p 500', 'ivv', 'wall street', '標普500', '美股'],
+        UPRO: ['s&p 500', 'upro', '標普500'],
+        FBTC: ['bitcoin', 'fbtc', 'btc', '比特幣', 'crypto'],
+        SE:   ['sea limited', 'shopee', '蝦皮', '冬海'],
         U:    ['unity software'],
         FLG:  ['flagstar'],
         TDOC: ['teladoc']
@@ -2796,8 +3017,8 @@
       const usHeld = getHeldSymbols().filter(s => !isTaiwanSymbol(s));
       if (usHeld.length === 0) return [];
       try {
-        const syms = explicitSymbol ? [explicitSymbol] : usHeld.slice(0, 12);
-        const url = `https://data.alpaca.markets/v1beta1/news?symbols=${encodeURIComponent(syms.join(','))}&limit=30&sort=desc`;
+        const syms = explicitSymbol ? [explicitSymbol] : usHeld.slice(0, 16);
+        const url = `https://data.alpaca.markets/v1beta1/news?symbols=${encodeURIComponent(syms.join(','))}&limit=35&sort=desc`;
         const res = await fetch(url, {
           headers: {
             'APCA-API-KEY-ID': alpacaKeyId,
@@ -2830,11 +3051,12 @@
       const heldSymbols = getHeldSymbols();
       if (heldSymbols.length === 0) return [];
       try {
-        const querySyms = explicitSymbol ? [explicitSymbol] : heldSymbols.slice(0, 8);
-        const flatTerms = [...new Set(querySyms.flatMap(buildSymbolTerms))].slice(0, 16);
-        const combinedQuery = flatTerms.join(' OR ');
-        const terms = `(${combinedQuery}) (sourcelang:eng OR sourcelang:zho)`;
-        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(terms)}&mode=ArtList&maxrecords=75&timespan=7d&sort=DateDesc&format=json`;
+        const querySyms = explicitSymbol ? [explicitSymbol] : heldSymbols.filter(s => !isTaiwanSymbol(s)).slice(0, 7);
+        const rawTerms = querySyms.length > 0 ? querySyms.flatMap(buildSymbolTerms) : ['TSMC', 'Taiwan', 'Nasdaq'];
+        const flatTerms = [...new Set(rawTerms)].filter(t => /^[ -~]+$/.test(t) && !t.includes('&')).slice(0, 10);
+        if (flatTerms.length === 0) return [];
+        const terms = `(${flatTerms.join(' OR ')}) sourcelang:eng`;
+        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(terms)}&mode=ArtList&maxrecords=45&timespan=7d&sort=DateDesc&format=json`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -2846,7 +3068,7 @@
               if (!sym) continue;
               fetched.push({
                 symbol: sym,
-                source: a.domain || 'News',
+                source: (a.domain || 'News').replace(/^www\./, ''),
                 datetime: parseGdeltDate(a.seendate),
                 headline: a.title,
                 url: a.url,
@@ -2861,6 +3083,126 @@
       return [];
     }
 
+    async function pullGdeltZhNewsArray(explicitSymbol = null) {
+      const heldSymbols = getHeldSymbols();
+      if (heldSymbols.length === 0) return [];
+      try {
+        const zhMap = {
+          '0050': ['台積電', '0050', '台股'],
+          '00631L': ['台股', '台積電', '00631L'],
+          '2330': ['台積電'],
+          NVDA: ['輝達', 'NVIDIA'],
+          TSLA: ['特斯拉'],
+          MSFT: ['微軟'],
+          AAPL: ['蘋果'],
+          AMZN: ['亞馬遜'],
+          GOOG: ['谷歌', 'Alphabet'],
+          META: ['Meta', '臉書'],
+          FBTC: ['比特幣'],
+          QQQ: ['那斯達克'],
+          IVV: ['標普500', '美股']
+        };
+        const zhTerms = explicitSymbol
+          ? (zhMap[explicitSymbol] || [explicitSymbol])
+          : [...new Set(heldSymbols.slice(0, 10).flatMap(s => zhMap[s] || []))].slice(0, 9);
+        if (zhTerms.length === 0) return [];
+        const terms = `(${zhTerms.join(' OR ')}) sourcelang:zho`;
+        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(terms)}&mode=ArtList&maxrecords=30&timespan=7d&sort=DateDesc&format=json`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.articles)) {
+            const fetched = [];
+            for (const a of data.articles) {
+              if (!a || !a.url || !a.title) continue;
+              const sym = explicitSymbol || matchSymbolFromTitle(a.title, heldSymbols);
+              if (!sym) continue;
+              fetched.push({
+                symbol: sym,
+                source: (a.domain || '中文財經').replace(/^www\./, ''),
+                datetime: parseGdeltDate(a.seendate),
+                headline: a.title,
+                url: a.url,
+                _live: true,
+                _sourceType: 'gdelt_zh'
+              });
+            }
+            return fetched;
+          }
+        }
+      } catch (e) {}
+      return [];
+    }
+
+    async function pullFinnhubMultiNews(explicitSymbol = null) {
+      if (!apiKey) return [];
+      const heldSymbols = getHeldSymbols();
+      const usHeld = heldSymbols.filter(s => !isTaiwanSymbol(s));
+      if (usHeld.length === 0) return [];
+      const fetched = [];
+      try {
+        const toStr = new Date().toISOString().slice(0, 10);
+        const fromStr = new Date(Date.now() - 5 * 86400 * 1000).toISOString().slice(0, 10);
+        const targetSyms = explicitSymbol && !isTaiwanSymbol(explicitSymbol) ? [explicitSymbol] : usHeld.slice(0, 4);
+        const reqs = targetSyms.map(sym =>
+          fetch(`https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${fromStr}&to=${toStr}&token=${encodeURIComponent(apiKey)}`)
+            .then(r => r.ok ? r.json() : [])
+            .then(arr => Array.isArray(arr) ? arr.slice(0, 4).map(n => ({ ...n, _sym: sym })) : [])
+            .catch(() => [])
+        );
+        if (!explicitSymbol) {
+          reqs.push(
+            fetch(`https://finnhub.io/api/v1/news?category=general&token=${encodeURIComponent(apiKey)}`)
+              .then(r => r.ok ? r.json() : [])
+              .then(arr => Array.isArray(arr) ? arr.slice(0, 15).map(n => ({ ...n, _sym: null })) : [])
+              .catch(() => [])
+          );
+        }
+        const results = await Promise.all(reqs);
+        for (const group of results) {
+          for (const n of group) {
+            if (!n || !n.headline || !n.url) continue;
+            const sym = n._sym || matchSymbolFromTitle(n.headline, heldSymbols);
+            if (!sym) continue;
+            fetched.push({
+              symbol: sym,
+              source: n.source || 'Finnhub',
+              datetime: n.datetime || Math.floor(Date.now() / 1000),
+              headline: n.headline,
+              url: n.url,
+              _live: true,
+              _sourceType: 'finnhub'
+            });
+          }
+        }
+      } catch (e) {}
+      return fetched;
+    }
+
+    async function pullCryptoNewsArray(explicitSymbol = null) {
+      const held = getHeldSymbols();
+      if (!held.includes('FBTC') && explicitSymbol !== 'FBTC') return [];
+      if (explicitSymbol && explicitSymbol !== 'FBTC') return [];
+      try {
+        const res = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=BTC');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.Data)) {
+            return data.Data.slice(0, 6).map(n => ({
+              symbol: 'FBTC',
+              source: n.source_info?.name || n.source || 'CryptoNews',
+              datetime: n.published_on || Math.floor(Date.now() / 1000),
+              headline: n.title,
+              url: n.url,
+              _live: true,
+              _sourceType: 'crypto'
+            }));
+          }
+        }
+      } catch (e) {}
+      return [];
+    }
+
     function mergeAndDedupeNews(items) {
       const seenUrls = new Set();
       const seenTitles = new Set();
@@ -2868,7 +3210,7 @@
       for (const item of items) {
         if (!item || !item.url || !item.headline) continue;
         if (seenUrls.has(item.url)) continue;
-        const normTitle = item.headline.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '').slice(0, 38);
+        const normTitle = item.headline.toLowerCase().replace(/[^a-z0-9一-鿿]/g, '').slice(0, 38);
         if (normTitle && seenTitles.has(normTitle)) continue;
         seenUrls.add(item.url);
         if (normTitle) seenTitles.add(normTitle);
@@ -2877,12 +3219,43 @@
       return merged.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
     }
 
+    // Balance sources & tickers so one outlet (e.g. fiscal.ai) never monopolizes the top page
+    function diversifyNewsList(sortedItems, pageSize = 9) {
+      if (sortedItems.length <= 2) return sortedItems;
+      const pool = [...sortedItems];
+      const result = [];
+      while (pool.length > 0) {
+        const pageIdx = Math.floor(result.length / pageSize);
+        const pageSlice = result.slice(pageIdx * pageSize);
+        const sourceCounts = {};
+        const symbolCounts = {};
+        for (const r of pageSlice) {
+          const src = (r.source || '').toLowerCase();
+          sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+          symbolCounts[r.symbol] = (symbolCounts[r.symbol] || 0) + 1;
+        }
+        const prev = result[result.length - 1];
+        const prevSrc = prev ? (prev.source || '').toLowerCase() : '';
+        const prevSym = prev ? prev.symbol : '';
+
+        let pickIdx = pool.findIndex(item => {
+          const src = (item.source || '').toLowerCase();
+          return src !== prevSrc && item.symbol !== prevSym && (sourceCounts[src] || 0) < 2 && (symbolCounts[item.symbol] || 0) < 2;
+        });
+        if (pickIdx === -1) {
+          pickIdx = pool.findIndex(item => {
+            const src = (item.source || '').toLowerCase();
+            return (sourceCounts[src] || 0) < 3 && (symbolCounts[item.symbol] || 0) < 3;
+          });
+        }
+        if (pickIdx === -1) pickIdx = 0;
+        result.push(pool.splice(pickIdx, 1)[0]);
+      }
+      return result;
+    }
+
     async function refreshHoldingsNewsSmart(explicitSymbol = null) {
       if (isFetchingNews) return;
-      if (apiKey && activeProvider === 'finnhub' && (!explicitSymbol || !isTaiwanSymbol(explicitSymbol))) {
-        await fetchHoldingsNews(explicitSymbol ? [explicitSymbol] : null);
-        return;
-      }
 
       const heldSymbols = getHeldSymbols();
       if (heldSymbols.length === 0) {
@@ -2896,13 +3269,16 @@
       const icon = document.getElementById('news-refresh-icon');
       if (icon) icon.classList.add('animate-spin');
 
-      const useAlpaca = activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret && (!explicitSymbol || !isTaiwanSymbol(explicitSymbol));
-      const [alpacaRes, gdeltRes] = await Promise.all([
+      const useAlpaca = alpacaKeyId && alpacaSecret && (!explicitSymbol || !isTaiwanSymbol(explicitSymbol));
+      const [alpacaRes, gdeltEnRes, gdeltZhRes, finnhubRes, cryptoRes] = await Promise.all([
         useAlpaca ? pullAlpacaNewsArray(explicitSymbol) : Promise.resolve([]),
-        pullGdeltNewsArray(explicitSymbol)
+        pullGdeltNewsArray(explicitSymbol),
+        pullGdeltZhNewsArray(explicitSymbol),
+        pullFinnhubMultiNews(explicitSymbol),
+        pullCryptoNewsArray(explicitSymbol)
       ]);
 
-      const combined = mergeAndDedupeNews([...alpacaRes, ...gdeltRes]);
+      const combined = mergeAndDedupeNews([...gdeltZhRes, ...finnhubRes, ...gdeltEnRes, ...cryptoRes, ...alpacaRes]);
       if (combined.length > 0) {
         if (explicitSymbol) {
           const others = newsItems.filter(i => i._live && i.symbol !== explicitSymbol);
@@ -2967,8 +3343,8 @@
         btn.type = 'button';
         btn.textContent = p.label;
         btn.className = active
-          ? 'px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 text-white shrink-0 transition'
-          : 'px-3 py-1 rounded-full text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 shrink-0 transition';
+          ? 'px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-900 text-white transition'
+          : 'px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition';
         btn.addEventListener('click', () => {
           newsFilterSymbol = p.symbol;
           renderNewsFilters();
@@ -2987,20 +3363,15 @@
       const badge = document.getElementById('news-mode-badge');
       if (!grid) return;
 
-      const hasLiveNews = newsItems.some(n => n._live);
-      const hasAlpacaNews = newsItems.some(n => n._sourceType === 'alpaca');
-      const hasGdeltNews = newsItems.some(n => n._sourceType === 'gdelt');
-      if (hasAlpacaNews && hasGdeltNews) {
-        badge.textContent = 'Alpaca + GDELT 雙來源即時';
-        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
-      } else if (hasAlpacaNews) {
-        badge.textContent = 'Alpaca 即時新聞';
-        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
-      } else if (apiKey && activeProvider === 'finnhub') {
-        badge.textContent = 'Finnhub 即時新聞';
+      const liveItems = newsItems.filter(n => n._live);
+      const hasLiveNews = liveItems.length > 0;
+      const distinctOutlets = new Set(liveItems.map(n => (n.source || '').toLowerCase()).filter(Boolean)).size;
+      const distinctChannels = new Set(liveItems.map(n => n._sourceType).filter(Boolean)).size;
+      if (hasLiveNews && (distinctChannels >= 2 || distinctOutlets >= 3)) {
+        badge.textContent = `多來源即時 · ${Math.max(distinctOutlets, distinctChannels)} 家媒體`;
         badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
       } else if (hasLiveNews) {
-        badge.textContent = '全球即時新聞 (免金鑰)';
+        badge.textContent = '即時新聞';
         badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
       } else {
         badge.textContent = '範例預覽';
@@ -3008,11 +3379,12 @@
       }
 
       const activeSet = new Set(getHeldSymbols());
-      const filtered = newsItems
+      const matchingPool = newsItems
         .filter(n => activeSet.has(n.symbol))
         .filter(n => newsFilterSymbol === 'ALL' || n.symbol === newsFilterSymbol)
-        .sort((a, b) => (b.datetime || 0) - (a.datetime || 0))
-        .slice(0, newsDisplayLimit);
+        .sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
+      const diversifiedPool = newsFilterSymbol === 'ALL' ? diversifyNewsList(matchingPool, 9) : matchingPool;
+      const filtered = diversifiedPool.slice(0, newsDisplayLimit);
 
       if (filtered.length === 0) {
         grid.innerHTML = `<div class="col-span-full py-8 text-center text-xs text-slate-400">目前沒有符合篩選條件的持股新聞</div>`;
@@ -3035,7 +3407,7 @@
               </div>
               <span class="text-[11px] text-slate-400 shrink-0">${formatRelativeTime(item.datetime)}</span>
             </div>
-            <h3 class="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 leading-snug line-clamp-3">
+            <h3 class="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 leading-relaxed">
               ${escapeHtml(titleText)}
             </h3>
           </div>
@@ -3067,8 +3439,13 @@
         .filter(n => activeSet.has(n.symbol))
         .filter(n => newsFilterSymbol === 'ALL' || n.symbol === newsFilterSymbol).length;
       const moreWrap = document.getElementById('news-more-wrap');
+      const moreBtn = document.getElementById('btn-news-more');
       if (moreWrap) {
-        moreWrap.classList.toggle('hidden', totalMatching <= newsDisplayLimit);
+        const remaining = totalMatching - filtered.length;
+        moreWrap.classList.toggle('hidden', remaining <= 0);
+        if (moreBtn && remaining > 0) {
+          moreBtn.textContent = `顯示更多新聞（還有 ${remaining} 則）`;
+        }
       }
 
       if (triggerTranslate && newsLangZh) {
@@ -3215,9 +3592,19 @@
     }
 
     document.getElementById('btn-news-more').addEventListener('click', () => {
-      newsDisplayLimit += 12;
+      newsDisplayLimit += 9;
       renderNewsGrid();
     });
+
+    const backToTopBtn = document.getElementById('btn-back-to-top');
+    if (backToTopBtn) {
+      window.addEventListener('scroll', () => {
+        backToTopBtn.classList.toggle('hidden', window.scrollY < 360);
+      }, { passive: true });
+      backToTopBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
 
     document.getElementById('btn-news-lang').addEventListener('click', (e) => {
       newsLangZh = !newsLangZh;
@@ -3256,6 +3643,7 @@
         updateHideAmountsUI();
         renderTreemap();
         if (!allocModal.classList.contains('hidden')) renderAllocationList();
+        if (!historyModal.classList.contains('hidden')) renderHistoryModal();
       });
     }
 
@@ -3267,7 +3655,8 @@
     async function fetchAllTimeHighs(force = false) {
       if (athFetchedSession && !force) return;
       const usStocks = stocks.filter(s => getCurrency(s) === 'USD');
-      if (usStocks.length === 0) return;
+      const twStocks = stocks.filter(s => getCurrency(s) === 'TWD');
+      if (usStocks.length === 0 && twStocks.length === 0) return;
 
       if (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret) {
         try {
@@ -3319,7 +3708,6 @@
             athFetchedSession = true;
             saveStocks();
             if (!allocModal.classList.contains('hidden')) renderAllocationList();
-            return;
           }
         } catch (e) {}
       }
@@ -3343,6 +3731,50 @@
         athFetchedSession = true;
         saveStocks();
         if (!allocModal.classList.contains('hidden')) renderAllocationList();
+      }
+
+      // Fetch Taiwan Stock / ETF split-adjusted All-Time High via Fugle Historical Candles (strictly < 1 year per call)
+      if (fugleKey && twStocks.length > 0) {
+        const curYear = new Date().getFullYear();
+        const todayIso = getLocalDateStr();
+        let twUpdated = false;
+        for (const item of twStocks) {
+          const code = item.symbol.replace(/\.(TW|TWO)$/i, '').trim();
+          let maxH = 0;
+          for (let y = 2010; y <= curYear; y++) {
+            const fromStr = `${y}-01-01`;
+            const toStr = y === curYear ? todayIso : `${y}-12-31`;
+            if (fromStr > toStr) continue;
+            try {
+              const url = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${encodeURIComponent(code)}?timeframe=M&from=${fromStr}&to=${toStr}&fields=high&adjusted=true`;
+              const res = await fetch(url, {
+                headers: { 'X-API-KEY': fugleKey, 'Accept': 'application/json' }
+              });
+              if (res.status === 429) break;
+              if (res.ok) {
+                const json = await res.json();
+                if (json && Array.isArray(json.data)) {
+                  for (const bar of json.data) {
+                    const h = Number(bar && bar.high || 0);
+                    if (h > maxH) maxH = h;
+                  }
+                }
+              }
+            } catch (e) {}
+            await new Promise(r => setTimeout(r, 80));
+          }
+          if (maxH > 0) {
+            const best = Math.max(maxH, Number(item.high || 0), Number(item.price || 0));
+            item.ath = Number(best.toFixed(2));
+            item.athSource = '還原新高';
+            twUpdated = true;
+          }
+        }
+        if (twUpdated) {
+          athFetchedSession = true;
+          saveStocks();
+          if (!allocModal.classList.contains('hidden')) renderAllocationList();
+        }
       }
     }
 
@@ -3495,6 +3927,173 @@
     document.getElementById('am-alloc-done').addEventListener('click', () => allocModal.classList.add('hidden'));
     allocModal.addEventListener('click', (e) => { if (e.target === allocModal) allocModal.classList.add('hidden'); });
     if (allocSearchInput) allocSearchInput.addEventListener('input', renderAllocationList);
+
+    // 1. Dark Mode Toggle
+    const themeBtn = document.getElementById('btn-theme-mode');
+    function applyTheme() {
+      document.body.classList.toggle('dark-mode', darkMode);
+      if (themeBtn) themeBtn.textContent = darkMode ? '深色模式' : '淺色模式';
+    }
+    applyTheme();
+    if (themeBtn) {
+      themeBtn.addEventListener('click', () => {
+        darkMode = !darkMode;
+        safeSetStorage(STORAGE_KEY_THEME, darkMode ? 'dark' : 'light');
+        applyTheme();
+      });
+    }
+
+    // 2. Collapsible Secondary KPI Details (Desktop & Mobile)
+    const kpiToggleBtn = document.getElementById('btn-toggle-kpi-details');
+    if (kpiToggleBtn) {
+      kpiToggleBtn.addEventListener('click', () => {
+        kpiDetailsExpanded = !kpiDetailsExpanded;
+        const pills = document.getElementById('kpi-secondary-pills');
+        if (pills) {
+          pills.classList.toggle('hidden', !kpiDetailsExpanded);
+          pills.classList.toggle('flex', kpiDetailsExpanded);
+        }
+        document.getElementById('kpi-toggle-label').textContent = kpiDetailsExpanded
+          ? '收合明細 ▴'
+          : '展開總槓桿 / 持股檔數 / 匯率明細 ▾';
+      });
+    }
+
+    // 3. View Mode Toggle (熱力圖 / 漲跌排行)
+    function renderRankingView(activeVis, totalVisMV) {
+      const container = document.getElementById('ranking-stage');
+      if (!container) return;
+      const sortVal = document.getElementById('ranking-sort-select').value;
+      const rows = [...activeVis].map(item => ({
+        item,
+        mv: getMarketValue(item),
+        pct: Number(item.pct || 0),
+        pnl: getDayPnLUSD(item)
+      }));
+
+      if (sortVal === 'pct_desc') rows.sort((a, b) => b.pct - a.pct);
+      else if (sortVal === 'pct_asc') rows.sort((a, b) => a.pct - b.pct);
+      else if (sortVal === 'pnl_desc') rows.sort((a, b) => b.pnl - a.pnl);
+      else rows.sort((a, b) => a.pnl - b.pnl);
+
+      container.innerHTML = '';
+      rows.forEach(({ item, mv, pct, pnl }, idx) => {
+        const green = usColorMode ? pct >= 0 : pct < 0;
+        const sharePct = totalVisMV > 0 ? ((mv / totalVisMV) * 100).toFixed(1) : '0.0';
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'w-full py-2.5 px-2 flex items-center justify-between gap-2 text-left hover:bg-slate-50 rounded-lg transition';
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="text-xs font-bold text-slate-400 w-5 text-center">${idx + 1}</span>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="font-extrabold text-sm text-slate-900">${escapeHtml(item.symbol)}</span>
+                ${item.lockedPrice ? '<span class="text-[10px]" title="已鎖定自訂價">🔒</span>' : ''}
+                ${getLeverage(item) !== 1 ? `<span class="text-[10px] font-bold px-1 rounded bg-amber-100 text-amber-800">${getLeverage(item)}x</span>` : ''}
+              </div>
+              <div class="text-[11px] text-slate-400 truncate">佔比 ${sharePct}% · ${formatNativePrice(item)}</div>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-extrabold ${green ? 'text-emerald-600' : 'text-rose-600'}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
+            <div class="text-xs font-semibold ${green ? 'text-emerald-600' : 'text-rose-600'}">${hideAmounts ? '••••••' : formatSignedCurrency(pnl)}</div>
+          </div>
+        `;
+        row.addEventListener('click', () => openDetailModal(item.symbol));
+        container.appendChild(row);
+      });
+    }
+
+    document.querySelectorAll('.vm-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewMode = btn.dataset.vm || 'treemap';
+        document.querySelectorAll('.vm-btn').forEach(b => {
+          const act = b.dataset.vm === viewMode;
+          b.className = act
+            ? 'vm-btn px-3 py-1 rounded-md bg-white text-slate-900 shadow-2xs transition'
+            : 'vm-btn px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
+        });
+        document.getElementById('ranking-sort-bar').classList.toggle('hidden', viewMode !== 'ranking');
+        renderTreemap();
+      });
+    });
+    document.getElementById('ranking-sort-select').addEventListener('change', () => renderTreemap());
+
+    // 4. Leverage Breakdown Modal
+    const leverageModal = document.getElementById('leverage-modal');
+    function openLeverageModal() {
+      const vis = getVisibleStocks().filter(s => (Number(s.shares) || 0) > 0);
+      const totalMV = vis.reduce((s, d) => s + getMarketValue(d), 0);
+      const totalExp = vis.reduce((s, d) => s + getMarketValue(d) * getLeverage(d), 0);
+      const levRatio = totalMV > 0 ? totalExp / totalMV : 1;
+
+      const mv1x = vis.filter(d => getLeverage(d) === 1).reduce((s, d) => s + getMarketValue(d), 0);
+      const pct1x = totalMV > 0 ? (mv1x / totalMV) * 100 : 100;
+      const pctLev = 100 - pct1x;
+
+      document.getElementById('lm-total-lev').textContent = `${levRatio.toFixed(2)}x`;
+      document.getElementById('lm-total-exp').textContent = hideAmounts ? '••••••' : formatCurrency(totalExp);
+      document.getElementById('lm-1x-pct').textContent = `${pct1x.toFixed(1)}%`;
+      document.getElementById('lm-lev-pct').textContent = `${pctLev.toFixed(1)}%`;
+      document.getElementById('lm-1x-bar').style.width = `${pct1x.toFixed(1)}%`;
+
+      const top5 = [...vis]
+        .map(d => ({ item: d, exp: getMarketValue(d) * getLeverage(d), lev: getLeverage(d) }))
+        .sort((a, b) => Math.abs(b.exp) - Math.abs(a.exp))
+        .slice(0, 5);
+
+      document.getElementById('lm-top5-list').innerHTML = top5.map(({ item, exp, lev }) => {
+        const expShare = totalExp > 0 ? ((exp / totalExp) * 100).toFixed(1) : '0.0';
+        return `
+          <div class="py-2 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <span class="font-bold text-slate-900">${escapeHtml(item.symbol)}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">${lev}x</span>
+            </div>
+            <div class="text-right">
+              <span class="font-bold text-slate-900">佔總曝險 ${expShare}%</span>
+              ${hideAmounts ? '' : `<span class="text-slate-400 ml-1">(${formatCurrency(exp)})</span>`}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      leverageModal.classList.remove('hidden');
+    }
+
+    document.getElementById('btn-leverage-card').addEventListener('click', openLeverageModal);
+    document.getElementById('lm-close').addEventListener('click', () => leverageModal.classList.add('hidden'));
+    document.getElementById('lm-done').addEventListener('click', () => leverageModal.classList.add('hidden'));
+    leverageModal.addEventListener('click', (e) => { if (e.target === leverageModal) leverageModal.classList.add('hidden'); });
+
+    // 5. Custom Price Lock handlers inside Detail Modal
+    document.getElementById('dm-lock-price').addEventListener('change', (e) => {
+      if (!selectedSymbol) return;
+      const item = stocks.find(s => s.symbol === selectedSymbol);
+      if (!item) return;
+      item.lockedPrice = e.target.checked;
+      document.getElementById('dm-custom-price-row').classList.toggle('hidden', !item.lockedPrice);
+      saveStocks();
+      renderTreemap();
+    });
+
+    document.getElementById('dm-save-price').addEventListener('click', () => {
+      if (!selectedSymbol) return;
+      const val = parseFloat(document.getElementById('dm-custom-price-input').value);
+      if (!isNaN(val) && val > 0) {
+        const item = stocks.find(s => s.symbol === selectedSymbol);
+        if (item) {
+          item.price = val;
+          item.lockedPrice = true;
+          item.isLivePrice = false;
+          saveStocks();
+          renderTreemap(new Set([item.symbol]));
+          openDetailModal(item.symbol);
+          showToast(`已鎖定 ${item.symbol} 自訂現價`);
+        }
+      }
+    });
 
     function updateMarketFilterUI() {
       document.querySelectorAll('.mf-btn').forEach(btn => {
