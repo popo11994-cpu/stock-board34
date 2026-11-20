@@ -504,6 +504,14 @@
         <input id="alloc-search-input" type="search" placeholder="搜尋股票代號或名稱（如 QQQ、NVDA、0050）..."
           class="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900" />
       </div>
+      <div id="alloc-ath-editor" class="hidden px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2 text-xs">
+        <span id="alloc-ath-sym" class="font-bold text-slate-900 shrink-0">0050</span>
+        <span class="text-slate-600 shrink-0">歷史最高價：</span>
+        <input id="alloc-ath-input" type="number" min="0.01" step="any" placeholder="輸入歷史最高價"
+          class="flex-1 px-2.5 py-1 bg-white border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        <button id="alloc-ath-save" type="button" class="px-3 py-1 bg-slate-900 text-white font-semibold rounded-lg shrink-0">套用</button>
+        <button id="alloc-ath-cancel" type="button" class="text-slate-500 hover:text-slate-800 px-1">取消</button>
+      </div>
       <div id="alloc-list" class="overflow-y-auto px-5 py-3 flex-1 divide-y divide-slate-100"></div>
       <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex items-center justify-between text-xs text-slate-500">
         <span id="alloc-summary-text">共 0 檔持股</span>
@@ -3264,34 +3272,54 @@
       if (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret) {
         try {
           const symbolsCsv = usStocks.map(s => encodeURIComponent(s.symbol)).join(',');
-          const url = `https://data.alpaca.markets/v2/stocks/bars?symbols=${symbolsCsv}&timeframe=1Month&start=2016-01-01T00:00:00Z&limit=10000&adjustment=split`;
-          const res = await fetch(url, {
-            headers: {
-              'APCA-API-KEY-ID': alpacaKeyId,
-              'APCA-API-SECRET-KEY': alpacaSecret,
-              'Accept': 'application/json'
-            }
-          });
-          if (res.ok) {
+          const endIso = new Date(Date.now() - 3600 * 1000).toISOString();
+          const maxMap = new Map();
+          let pageToken = null;
+          let pageCount = 0;
+
+          do {
+            const url = `https://data.alpaca.markets/v2/stocks/bars?symbols=${symbolsCsv}&timeframe=1Month&start=1995-01-01T00:00:00Z&end=${encodeURIComponent(endIso)}&limit=10000&adjustment=split&feed=sip`
+              + (pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : '');
+            const res = await fetch(url, {
+              headers: {
+                'APCA-API-KEY-ID': alpacaKeyId,
+                'APCA-API-SECRET-KEY': alpacaSecret,
+                'Accept': 'application/json'
+              }
+            });
+            if (!res.ok) break;
             const data = await res.json();
             const barsMap = data && data.bars;
             if (barsMap) {
-              usStocks.forEach(item => {
-                const bars = barsMap[item.symbol];
-                if (Array.isArray(bars) && bars.length > 0) {
-                  const maxH = bars.reduce((m, b) => Math.max(m, Number(b.h || 0)), 0);
-                  const best = Math.max(maxH, Number(item.high || 0), Number(item.price || 0));
-                  if (best > 0) {
-                    item.ath = Number(best.toFixed(2));
-                    item.athSource = 'ATH';
+              for (const sym of Object.keys(barsMap)) {
+                const bars = barsMap[sym];
+                if (Array.isArray(bars)) {
+                  let curMax = maxMap.get(sym) || 0;
+                  for (const b of bars) {
+                    const h = Number(b && b.h || 0);
+                    if (h > curMax) curMax = h;
                   }
+                  if (curMax > 0) maxMap.set(sym, curMax);
                 }
-              });
-              athFetchedSession = true;
-              saveStocks();
-              if (!allocModal.classList.contains('hidden')) renderAllocationList();
-              return;
+              }
             }
+            pageToken = data && data.next_page_token ? data.next_page_token : null;
+            pageCount++;
+          } while (pageToken && pageCount < 8);
+
+          if (maxMap.size > 0) {
+            usStocks.forEach(item => {
+              const histMax = maxMap.get(item.symbol) || 0;
+              if (histMax > 0) {
+                const best = Math.max(histMax, Number(item.high || 0), Number(item.price || 0));
+                item.ath = Number(best.toFixed(2));
+                item.athSource = '歷史新高';
+              }
+            });
+            athFetchedSession = true;
+            saveStocks();
+            if (!allocModal.classList.contains('hidden')) renderAllocationList();
+            return;
           }
         } catch (e) {}
       }
@@ -3373,19 +3401,20 @@
         const barW = Math.min(Math.max(pct, 1), 100);
 
         const curP = Number(item.price || 0);
-        const athVal = Number(item.ath || item.high || 0);
-        let athHtml = '<span class="text-[10px] text-slate-400">歷史高點：待更新</span>';
+        const athVal = Number(item.ath || 0);
+        let athHtml = `<button type="button" data-edit-ath="${escapeHtml(item.symbol)}" class="alloc-ath-edit text-[10px] text-blue-600 hover:underline font-medium">設定歷史高點</button>`;
         if (curP > 0 && athVal > 0) {
           const effectiveAth = Math.max(athVal, curP);
           const ratioPct = (curP / effectiveAth) * 100;
           const drawdownPct = ratioPct - 100;
           const ratioCls = ratioPct >= 95 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
             : (ratioPct >= 80 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200');
-          const labelTag = item.athSource || '歷史高';
+          const labelTag = item.athSource || '歷史新高';
           const priceNote = hideAmounts ? '' : ` · 現 ${formatNativePrice(item)} / 高 ${getCurrency(item) === 'TWD' ? 'NT$' : '$'}${effectiveAth.toFixed(2)}`;
-          athHtml = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold ${ratioCls}">
+          athHtml = `<button type="button" data-edit-ath="${escapeHtml(item.symbol)}" title="點擊可手動修正歷史最高價"
+            class="alloc-ath-edit inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold ${ratioCls} hover:opacity-80 transition">
             <span>現價/${labelTag} ${ratioPct.toFixed(1)}% (${drawdownPct.toFixed(1)}%)</span>${priceNote ? `<span class="opacity-75">${priceNote}</span>` : ''}
-          </span>`;
+          </button>`;
         }
 
         return `
@@ -3410,7 +3439,38 @@
           </div>
         `;
       }).join('');
+
+      listEl.querySelectorAll('.alloc-ath-edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const sym = e.currentTarget.dataset.editAth;
+          const item = stocks.find(s => s.symbol === sym);
+          if (!item) return;
+          editingAthSymbol = sym;
+          document.getElementById('alloc-ath-sym').textContent = sym;
+          document.getElementById('alloc-ath-input').value = item.ath || '';
+          document.getElementById('alloc-ath-editor').classList.remove('hidden');
+          document.getElementById('alloc-ath-input').focus();
+        });
+      });
     }
+
+    let editingAthSymbol = null;
+    document.getElementById('alloc-ath-save').addEventListener('click', () => {
+      const val = parseFloat(document.getElementById('alloc-ath-input').value);
+      if (!isNaN(val) && val > 0 && editingAthSymbol) {
+        const item = stocks.find(s => s.symbol === editingAthSymbol);
+        if (item) {
+          item.ath = val;
+          item.athSource = '歷史新高';
+          saveStocks();
+          renderAllocationList();
+        }
+      }
+      document.getElementById('alloc-ath-editor').classList.add('hidden');
+    });
+    document.getElementById('alloc-ath-cancel').addEventListener('click', () => {
+      document.getElementById('alloc-ath-editor').classList.add('hidden');
+    });
 
     async function syncAllocPricesAndAth(forceAth = false) {
       updateAllocPriceStatus(true);
