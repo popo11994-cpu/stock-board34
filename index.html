@@ -493,7 +493,14 @@
         </div>
         <button id="am-alloc-close" type="button" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
       </div>
-      <div class="px-5 py-3 border-b border-slate-100 bg-slate-50">
+      <div class="px-5 py-3 border-b border-slate-100 bg-slate-50 space-y-2">
+        <div class="flex items-center justify-between gap-2 text-[11px]">
+          <span id="alloc-price-status" class="text-slate-500 font-medium">檢查最新價格中...</span>
+          <button id="alloc-refresh-btn" type="button"
+            class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold shrink-0 transition">
+            ↻ 立即更新現價與高點
+          </button>
+        </div>
         <input id="alloc-search-input" type="search" placeholder="搜尋股票代號或名稱（如 QQQ、NVDA、0050）..."
           class="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900" />
       </div>
@@ -3244,9 +3251,94 @@
       });
     }
 
-    // Allocation Lookup Modal
+    // Allocation Lookup Modal & All-Time High (ATH) Fetcher
     const allocModal = document.getElementById('allocation-modal');
     const allocSearchInput = document.getElementById('alloc-search-input');
+    let athFetchedSession = false;
+
+    async function fetchAllTimeHighs(force = false) {
+      if (athFetchedSession && !force) return;
+      const usStocks = stocks.filter(s => getCurrency(s) === 'USD');
+      if (usStocks.length === 0) return;
+
+      if (activeProvider === 'alpaca' && alpacaKeyId && alpacaSecret) {
+        try {
+          const symbolsCsv = usStocks.map(s => encodeURIComponent(s.symbol)).join(',');
+          const url = `https://data.alpaca.markets/v2/stocks/bars?symbols=${symbolsCsv}&timeframe=1Month&start=2016-01-01T00:00:00Z&limit=10000&adjustment=split`;
+          const res = await fetch(url, {
+            headers: {
+              'APCA-API-KEY-ID': alpacaKeyId,
+              'APCA-API-SECRET-KEY': alpacaSecret,
+              'Accept': 'application/json'
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const barsMap = data && data.bars;
+            if (barsMap) {
+              usStocks.forEach(item => {
+                const bars = barsMap[item.symbol];
+                if (Array.isArray(bars) && bars.length > 0) {
+                  const maxH = bars.reduce((m, b) => Math.max(m, Number(b.h || 0)), 0);
+                  const best = Math.max(maxH, Number(item.high || 0), Number(item.price || 0));
+                  if (best > 0) {
+                    item.ath = Number(best.toFixed(2));
+                    item.athSource = 'ATH';
+                  }
+                }
+              });
+              athFetchedSession = true;
+              saveStocks();
+              if (!allocModal.classList.contains('hidden')) renderAllocationList();
+              return;
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (apiKey) {
+        for (let i = 0; i < Math.min(usStocks.length, 12); i++) {
+          const item = usStocks[i];
+          try {
+            const res = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(item.symbol)}&metric=all&token=${encodeURIComponent(apiKey)}`);
+            if (res.ok) {
+              const data = await res.json();
+              const high52 = data && data.metric && data.metric['52WeekHigh'];
+              if (typeof high52 === 'number' && high52 > 0) {
+                item.ath = Number(Math.max(high52, Number(item.price || 0)).toFixed(2));
+                item.athSource = '52W高';
+              }
+            }
+          } catch (e) {}
+          if (i < usStocks.length - 1) await new Promise(r => setTimeout(r, 65));
+        }
+        athFetchedSession = true;
+        saveStocks();
+        if (!allocModal.classList.contains('hidden')) renderAllocationList();
+      }
+    }
+
+    function updateAllocPriceStatus(syncing = false) {
+      const statusEl = document.getElementById('alloc-price-status');
+      if (!statusEl) return;
+      if (syncing) {
+        statusEl.textContent = '⏳ 正在同步最新現價與歷史最高價...';
+        statusEl.className = 'text-blue-600 font-semibold';
+        return;
+      }
+      const anyLive = stocks.some(s => s.isLivePrice);
+      if (hasActiveQuotesAuth() && anyLive) {
+        const ts = lastUpdatedEl ? lastUpdatedEl.textContent : '';
+        statusEl.textContent = `✅ 已確認最新價格 (${ts || '已連線即時報價'})`;
+        statusEl.className = 'text-emerald-700 font-semibold';
+      } else if (stocks.some(s => getCurrency(s) === 'TWD' && s.isLivePrice)) {
+        statusEl.textContent = '⚠️ 台股已更新；美股為範例價（請於設定連線 Alpaca/Finnhub）';
+        statusEl.className = 'text-amber-700 font-medium';
+      } else {
+        statusEl.textContent = '⚠️ 目前為範例價格（請至「設定」連線 API 以取得即時現價與歷史高點）';
+        statusEl.className = 'text-amber-700 font-medium';
+      }
+    }
 
     function renderAllocationList() {
       const listEl = document.getElementById('alloc-list');
@@ -3279,13 +3371,32 @@
         const chg = Number(item.pct || 0);
         const green = usColorMode ? chg >= 0 : chg < 0;
         const barW = Math.min(Math.max(pct, 1), 100);
+
+        const curP = Number(item.price || 0);
+        const athVal = Number(item.ath || item.high || 0);
+        let athHtml = '<span class="text-[10px] text-slate-400">歷史高點：待更新</span>';
+        if (curP > 0 && athVal > 0) {
+          const effectiveAth = Math.max(athVal, curP);
+          const ratioPct = (curP / effectiveAth) * 100;
+          const drawdownPct = ratioPct - 100;
+          const ratioCls = ratioPct >= 95 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : (ratioPct >= 80 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200');
+          const labelTag = item.athSource || '歷史高';
+          const priceNote = hideAmounts ? '' : ` · 現 ${formatNativePrice(item)} / 高 ${getCurrency(item) === 'TWD' ? 'NT$' : '$'}${effectiveAth.toFixed(2)}`;
+          athHtml = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold ${ratioCls}">
+            <span>現價/${labelTag} ${ratioPct.toFixed(1)}% (${drawdownPct.toFixed(1)}%)</span>${priceNote ? `<span class="opacity-75">${priceNote}</span>` : ''}
+          </span>`;
+        }
+
         return `
           <div class="py-2.5 flex items-center justify-between gap-3">
             <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-bold text-sm text-slate-900">${escapeHtml(item.symbol)}</span>
                 <span class="text-xs text-slate-500 truncate">${escapeHtml(item.name || '')}</span>
+                ${item.isLivePrice ? '<span class="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-700 font-bold">即時</span>' : ''}
               </div>
+              <div class="mt-1">${athHtml}</div>
               <div class="mt-1.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                 <div class="bg-slate-800 h-1.5 rounded-full" style="width:${barW.toFixed(1)}%"></div>
               </div>
@@ -3301,12 +3412,25 @@
       }).join('');
     }
 
+    async function syncAllocPricesAndAth(forceAth = false) {
+      updateAllocPriceStatus(true);
+      await Promise.all([
+        hasActiveQuotesAuth() ? fetchAllQuotes() : Promise.resolve(),
+        fetchTwseQuotes(),
+        fetchAllTimeHighs(forceAth)
+      ]);
+      updateAllocPriceStatus(false);
+      renderAllocationList();
+    }
+
     document.getElementById('btn-allocation').addEventListener('click', () => {
       if (allocSearchInput) allocSearchInput.value = '';
       renderAllocationList();
       allocModal.classList.remove('hidden');
       if (allocSearchInput) allocSearchInput.focus();
+      syncAllocPricesAndAth(false);
     });
+    document.getElementById('alloc-refresh-btn').addEventListener('click', () => syncAllocPricesAndAth(true));
     document.getElementById('am-alloc-close').addEventListener('click', () => allocModal.classList.add('hidden'));
     document.getElementById('am-alloc-done').addEventListener('click', () => allocModal.classList.add('hidden'));
     allocModal.addEventListener('click', (e) => { if (e.target === allocModal) allocModal.classList.add('hidden'); });
