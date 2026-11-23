@@ -995,7 +995,12 @@
       if (marketFilter === 'TWD') return stocks.filter(s => getCurrency(s) === 'TWD');
       return stocks;
     }
-    let usdTwdRate = 32.50;
+    const STORAGE_KEY_FX = 'tm_fx_rate_v1';
+    let usdTwdRate = (() => {
+      const saved = parseFloat(safeGetStorage(STORAGE_KEY_FX));
+      return (Number.isFinite(saved) && saved > 15 && saved < 60) ? saved : 32.50;
+    })();
+    let finnhubFxBlocked = false;
     let demoLive = false;
     let demoTimer = null;
     let pollTimer = null;
@@ -2412,32 +2417,44 @@
       }, 2500);
     });
 
-    // USD/TWD Exchange Rate (Finnhub real-time FX if key set, fallback to open.er-api.com)
-    async function fetchFxRate() {
+    function applyFxRate(rate, sourceLabel) {
+      if (!Number.isFinite(rate) || rate <= 15 || rate >= 60) return false;
+      usdTwdRate = rate;
+      safeSetStorage(STORAGE_KEY_FX, String(rate));
       const fxEl = document.getElementById('fx-live-val');
-      if (apiKey) {
+      if (fxEl) {
+        fxEl.textContent = usdTwdRate.toFixed(2);
+        fxEl.title = `更新於 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })} (${sourceLabel})`;
+      }
+      renderTreemap();
+      return true;
+    }
+
+    // USD/TWD Exchange Rate (Finnhub FX -> open.er-api.com -> jsDelivr currency-api)
+    async function fetchFxRate() {
+      if (apiKey && !finnhubFxBlocked) {
         try {
-          const res = await fetch(`https://finnhub.io/api/v1/forex/rates?base=USD&token=${encodeURIComponent(apiKey)}`);
-          if (res.ok) {
+          const res = await fetch(`https://finnhub.io/api/v1/forex/rates?base=USD&token=${encodeURIComponent(apiKey)}`, { cache: 'no-store' });
+          if (res.status === 401 || res.status === 403) {
+            finnhubFxBlocked = true;
+          } else if (res.ok) {
             const data = await res.json();
-            if (data && data.quote && typeof data.quote.TWD === 'number' && data.quote.TWD > 0) {
-              usdTwdRate = data.quote.TWD;
-              if (fxEl) fxEl.textContent = usdTwdRate.toFixed(2);
-              renderTreemap();
-              return;
-            }
+            if (data && data.quote && applyFxRate(Number(data.quote.TWD), 'Finnhub')) return;
           }
         } catch (e) {}
       }
       try {
-        const res = await fetch('https://open.er-api.com/v6/latest/USD');
+        const res = await fetch('https://open.er-api.com/v6/latest/USD', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.rates && typeof data.rates.TWD === 'number') {
-            usdTwdRate = data.rates.TWD;
-            if (fxEl) fxEl.textContent = usdTwdRate.toFixed(2);
-            renderTreemap();
-          }
+          if (data && data.rates && applyFxRate(Number(data.rates.TWD), 'open.er-api')) return;
+        }
+      } catch (e) {}
+      try {
+        const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.usd && applyFxRate(Number(data.usd.twd), 'currency-api')) return;
         }
       } catch (e) {}
     }
@@ -2690,8 +2707,6 @@
         errorBanner.classList.remove('hidden');
       }
       updateStatusUI();
-      fetchFxRate();
-      fetchTwseQuotes();
       fetchFxRate();
       fetchTwseQuotes();
     }
@@ -4103,7 +4118,9 @@
       btn.addEventListener('click', () => {
         marketFilter = btn.dataset.mf || 'ALL';
         safeSetStorage(STORAGE_KEY_MARKET_FILTER, marketFilter);
-        updateMarketFilterUI();
+        const initFxEl = document.getElementById('fx-live-val');
+      if (initFxEl) initFxEl.textContent = usdTwdRate.toFixed(2);
+      updateMarketFilterUI();
         renderTreemap();
         syncNewsWithHoldings();
       });
